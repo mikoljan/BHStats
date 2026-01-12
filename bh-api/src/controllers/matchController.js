@@ -1,6 +1,7 @@
 import e from "express";
 import Match from "../models/matchModel.js";
-import { loadHtml } from "../utils/helpers.js";
+import { loadHtml, getDivSection } from "../utils/helpers.js";
+import { getTeamSeasonByYear } from "./seasonController.js";
 import * as cheerio from "cheerio";
 
 export async function getMatches(req, res) {
@@ -86,9 +87,31 @@ export async function importMatchFromCFLink(req, res) {
         presentPlayers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Player' }],
     */
 
+    const mainStatsDiv = getDivSection("STATISTIKA UTKÁNÍ", $);
+
+    mainStatsDiv.find("tr").each((i, row) => {
+      if (i === 0) return; // header
+
+      const cols = $(row).find("td");
+      if (cols.length < 5) return;
+
+      $(mainStatsDiv.find("tr")[0]).find("td")[0].text()
+
+      goals.push({
+        period: $(cols[0]).text().trim(),
+        time: $(cols[1]).text().trim(),
+        team: $(cols[2]).text().trim(),
+        number: $(cols[3]).text().trim(),
+        player: $(cols[4]).text().trim(),
+        assist1: $(cols[5])?.text().trim() || null,
+        assist2: $(cols[6])?.text().trim() || null,
+      });
+    });
+
     // Season:
-    const season = year; // TODO: get season ID from year
+    const season = await getTeamSeasonByYear(team, year);
     // Stadium:
+    "STATISTIKA UTKÁNÍ";
     const stadium = null;
     // Date:
     const date = null;
@@ -108,6 +131,8 @@ export async function importMatchFromCFLink(req, res) {
     const goals = [];
     // Penalties
     const penalties = [];
+    // Goalies minutes
+    const goaliesMinutes = [];
 
 
     res.status(200).json({ message: `Importing match from CF link: ${link}, Team: ${team}, Year: ${year}` });

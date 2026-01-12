@@ -14,6 +14,10 @@ const matchSchema = new mongoose.Schema({
     result: { type: String, enum: ["Win", "Loss", "Draw", "Penalty Win", "Penalty Loss"], required: true },
 
     presentPlayers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Player' }],
+    goaliesMinutes: [{ 
+        player: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' },
+        minutesPlayed: { type: Number, required: true, default: 36 }
+    }],
 }, { timestamps: true });
 
 export default mongoose.model("Match", matchSchema);

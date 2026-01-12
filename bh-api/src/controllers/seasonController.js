@@ -23,6 +23,21 @@ export async function getSeasonById(req, res) {
   }
 }
 
+
+export async function getTeamSeasonByYear(req, res) {
+  try {
+    const { team, year } = req.params;
+    const season = await Season.findOne({ team, year: parseInt(year) });
+    if (!season) {
+      return res.status(404).json({ message: "Season not found" });
+    }
+    res.status(200).json(season);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch season" });
+  }
+}
+
 export async function createSeason(req, res) {
   try {
     const newSeason = new Season(req.body);

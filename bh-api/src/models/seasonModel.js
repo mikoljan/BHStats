@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const seasonSchema = new mongoose.Schema({
-    year: { type: Number },
+    year: { type: String, required: true },
     team: { type: String, enum: ['A', 'B', 'C'], required: true },
     leagueLevel: { type: Number, required: true },
     leagueName: { type: String },
