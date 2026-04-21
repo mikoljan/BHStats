@@ -1,5 +1,9 @@
 import Season from "../models/seasonModel.js";
 
+export async function findTeamSeasonByYear(team, year) {
+  return Season.findOne({ team, year: String(year) });
+}
+
 export async function getSeasons(req, res) {
   try {
     const seasons = await Season.find();
@@ -27,7 +31,7 @@ export async function getSeasonById(req, res) {
 export async function getTeamSeasonByYear(req, res) {
   try {
     const { team, year } = req.params;
-    const season = await Season.findOne({ team, year: parseInt(year) });
+    const season = await findTeamSeasonByYear(team, year);
     if (!season) {
       return res.status(404).json({ message: "Season not found" });
     }
