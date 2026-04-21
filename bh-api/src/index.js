@@ -1,6 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
+import adminRoutes from "./routes/admin.js";
 import playersRoutes from "./routes/players.js";
 import matchesRoutes from "./routes/matches.js";
 
@@ -13,6 +14,7 @@ connectDB();
 const app = express();
 app.use(express.json());
 
+app.use("/api/admin", adminRoutes);
 app.use("/api/players", playersRoutes);
 app.use("/api/matches", matchesRoutes);
 
