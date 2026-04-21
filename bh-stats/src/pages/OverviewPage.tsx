@@ -1,0 +1,1 @@
+export { MainPage as OverviewPage } from '@pages/MainPage';

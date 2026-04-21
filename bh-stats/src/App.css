@@ -1,0 +1,16 @@
+.app-shell {
+	position: relative;
+}
+
+.app-shell::before {
+	content: '';
+	position: fixed;
+	inset: auto -15% -15% auto;
+	width: 26rem;
+	height: 26rem;
+	border-radius: 9999px;
+	background: radial-gradient(circle, rgba(34, 211, 238, 0.15), transparent 64%);
+	filter: blur(20px);
+	pointer-events: none;
+	z-index: -1;
+}

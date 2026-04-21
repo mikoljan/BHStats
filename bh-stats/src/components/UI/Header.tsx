@@ -1,73 +1,52 @@
-import { Link, NavLink } from "react-router";
+import { NavLink } from 'react-router';
 import BHLogo from '@/assets/blue-horses.png';
-import { Trophy, Users, BarChart3 } from 'lucide-react';
+import { BarChart3, CalendarRange, Shield, Trophy, Users } from 'lucide-react';
 
 export const Header = () => {
-
   const navItems = [
-    { path: '/', label: 'Přehled', icon: BarChart3 },
+    { path: '/', label: 'Historie', icon: Shield },
     { path: '/players', label: 'Hráči', icon: Users },
+    { path: '/matches', label: 'Zápasy', icon: CalendarRange },
     { path: '/records', label: 'Rekordy', icon: Trophy },
+    { path: '/overview', label: 'Přehled', icon: BarChart3 },
   ];
 
   return (
-    <header className="bg-gradient-to-b from-slate-900 to-slate-950 border-b border-slate-800">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex items-center justify-between h-20">
-          
-          {/* Left: Logo + title */}
+    <header className="sticky top-0 z-40 border-b border-cyan-400/10 bg-slate-950/85 backdrop-blur-xl">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex min-h-20 flex-col gap-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:py-0">
           <div className="flex items-center gap-5">
-            <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center text-primary-content font-bold text-lg">
-              <img src={BHLogo} alt="Blue Horses Logo" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10">
+              <img src={BHLogo} alt="Blue Horses Logo" className="h-12 w-12 object-contain" />
             </div>
 
             <div className="leading-tight">
-              <div className="text-xl font-bold tracking-wide text-primary">
-                BLUE HORSES
-              </div>
-              <div className="text-sm text-slate-400">
-                Statistiky týmu
-              </div>
+              <div className="text-lg font-bold uppercase tracking-[0.3em] text-cyan-200">Blue Horses</div>
+              <div className="text-sm text-slate-400">Historie týmu, statistiky hráčů a správa zápasů</div>
             </div>
           </div>
 
-          {/* Right: Navigation */}
-          <nav className="flex items-center gap-2">
+          <nav className="flex flex-wrap items-center gap-2">
             {navItems.map(({ path, label, icon: Icon }) => (
-              <Link
+              <NavLink
                 key={path}
                 to={path}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  location.pathname === path
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
+                className={({ isActive }) =>
+                  `flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                    isActive
+                      ? 'bg-cyan-300 text-slate-950 shadow-[0_10px_30px_-14px_rgba(103,232,249,0.9)]'
+                      : 'text-slate-300 hover:bg-white/6 hover:text-white'
+                  }`
+                }
+                end={path === '/' || path === '/overview'}
               >
                 <Icon className="w-4 h-4" />
-                <span className="hidden sm:inline">{label}</span>
-              </Link>
+                <span>{label}</span>
+              </NavLink>
             ))}
           </nav>
-
         </div>
       </div>
     </header>
   );
 };
-
-interface NavItemProps {
-  to: string;
-  label: string;
-  icon: string;
-}
-
-const NavItem = ({ to, label, icon }: NavItemProps) => (
-  <NavLink
-    key={to}
-    to={to}
-    className="btn btn-sm gap-2 btn-primary"
-  >
-    <span>{icon}</span>
-    {label}
-  </NavLink>
-);

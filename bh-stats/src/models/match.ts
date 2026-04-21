@@ -1,8 +1,45 @@
+export type MatchResult = 'W' | 'L' | 'D';
+
+export interface GoalieMinutes {
+  playerId: string;
+  minutesPlayed: number;
+}
+
+export interface Goal {
+  id: string;
+  type: string;
+  time: number;
+  scorerId: string | null;
+  assistId: string | null;
+  matchId: string;
+  ourTeam: boolean;
+  winningGoal: boolean;
+  equalizingGoal: boolean;
+}
+
+export interface Penalty {
+  id: string;
+  type: string;
+  time: number;
+  penaltyMinutes: number;
+  playerId: string | null;
+  matchId: string;
+  ourTeam: boolean;
+}
+
 export interface Match {
   id: string;
+  stadiumId: string | null;
   date: string;
-  homeTeam: string;
-  awayTeam: string;
-  homeScore: number;
-  awayScore: number;
+  opponent: string;
+  seasonId: string;
+  homeGame: boolean;
+  matchLength: number;
+  ourScore: number;
+  opponentScore: number;
+  result: MatchResult;
+  presentPlayerIds: string[];
+  goalieMinutes: GoalieMinutes[];
+  goals: Goal[];
+  penalties: Penalty[];
 }
