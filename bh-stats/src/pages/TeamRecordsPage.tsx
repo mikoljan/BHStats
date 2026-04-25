@@ -2,7 +2,12 @@ import { useState } from 'react';
 import { Clock3, Medal, Sparkles, Star, Zap } from 'lucide-react';
 import { Table } from '@components/Table';
 import { ScopeTabs, type TeamScope } from '@components/UI/ScopeTabs';
-import { detailedRecordSections, recordHeroStats, type RecordBookIconName, type RecordBookRow } from '@utils/recordsBookData';
+import {
+  teamRecordHeroStats,
+  teamRecordSections,
+  type TeamRecordRow,
+} from '@utils/teamRecordsData';
+import type { RecordBookIconName } from '@utils/recordsBookData';
 
 const iconMap: Record<RecordBookIconName, typeof Medal> = {
   zap: Zap,
@@ -12,23 +17,23 @@ const iconMap: Record<RecordBookIconName, typeof Medal> = {
   clock: Clock3,
 };
 
-const readCell = (row: RecordBookRow, key: keyof RecordBookRow) => row[key] ?? '—';
+const readCell = (row: TeamRecordRow, key: keyof TeamRecordRow) => row[key] ?? '—';
 
-export const RecordsPage = () => {
+export const TeamRecordsPage = () => {
   const [scope, setScope] = useState<TeamScope>('A');
   const hasDetailedData = scope === 'A';
 
   return (
     <div className="space-y-8">
       <section className="hero-panel overflow-hidden rounded-[36px] p-6 sm:p-8">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.12),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(45,212,191,0.12),transparent_28%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.12),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(248,113,113,0.14),transparent_28%)]" />
         <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="eyebrow">Rekordbook</p>
-            <h1 className="section-title text-4xl sm:text-5xl">Hráčské rekordy v tabulkách</h1>
+            <h1 className="section-title text-4xl sm:text-5xl">Týmové rekordy v tabulkách</h1>
             <p className="mt-4 max-w-3xl text-slate-300">
-              Přehled je navržený jako kronika hráčských rekordů. Místo jedné dlouhé tabulky dostaneš několik jasně oddělených
-              bloků pro speciální týmy, hattricky a největší střelecké večery jednotlivců.
+              Samostatný pohled na týmové milníky: nejvyšší výhry a prohry, nejdelší série i nejrychlejší gólové nástupy.
+              Všechno v oddělených blocích, aby se hráčské a týmové rekordy nemíchaly dohromady.
             </p>
             <div className="mt-5">
               <ScopeTabs value={scope} onChange={setScope} />
@@ -36,7 +41,7 @@ export const RecordsPage = () => {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[520px]">
-            {recordHeroStats[scope].map((item) => (
+            {teamRecordHeroStats[scope].map((item) => (
               <article key={item.label} className="rounded-[28px] border border-white/10 bg-slate-950/55 px-4 py-4 backdrop-blur">
                 <div className="text-xs uppercase tracking-[0.24em] text-slate-400">{item.label}</div>
                 <div className="mt-2 text-3xl font-bold text-white">{item.value}</div>
@@ -48,7 +53,7 @@ export const RecordsPage = () => {
       </section>
 
       {hasDetailedData ? (
-        detailedRecordSections.map((section) => (
+        teamRecordSections.map((section) => (
           <section key={section.key} className="panel-soft p-5 sm:p-6">
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -84,7 +89,7 @@ export const RecordsPage = () => {
                             key: String(column.key),
                             header: column.header,
                             className: column.className,
-                            render: (row: RecordBookRow) => readCell(row, column.key),
+                            render: (row: TeamRecordRow) => readCell(row, column.key),
                           })),
                         ]}
                         data={table.rows}
@@ -99,8 +104,8 @@ export const RecordsPage = () => {
         ))
       ) : (
         <section className="panel-soft p-8 text-slate-300">
-          Detailní rekordbook je teď rozepsaný pro tým A podle dodaného výřezu ze stats.txt. Layout je připravený i pro B, C a A+B+C,
-          ale jejich tabulky zatím nejsou zapsané.
+          Detailní týmové rekordy jsou teď rozepsané pro tým A podle dodaného výřezu ze stats.txt. Layout je připravený i pro B,
+          C a A+B+C, ale jejich tabulky zatím nejsou zapsané.
         </section>
       )}
     </div>

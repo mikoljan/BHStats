@@ -29,6 +29,7 @@ export interface Penalty {
 
 export interface Match {
   id: string;
+  squad: 'A' | 'B' | 'C';
   stadiumId: string | null;
   date: string;
   opponent: string;

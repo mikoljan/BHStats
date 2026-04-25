@@ -8,6 +8,8 @@ import { OverviewPage } from '@pages/OverviewPage';
 import { PlayerDetailPage } from '@pages/PlayerDetailPage';
 import { PlayersPage } from '@pages/PlayersPage';
 import { RecordsPage } from '@pages/RecordsPage';
+import { SeriesPage } from '@pages/SeriesPage';
+import { TeamRecordsPage } from '@pages/TeamRecordsPage';
 
 function App() {
   return (
@@ -22,7 +24,10 @@ function App() {
             <Route path="/players/:playerId" element={<PlayerDetailPage />} />
             <Route path="/matches" element={<MatchesPage />} />
             <Route path="/matches/:matchId" element={<MatchDetailPage />} />
-            <Route path="/records" element={<RecordsPage />} />
+            <Route path="/records" element={<Navigate to="/records/player" replace />} />
+            <Route path="/records/player" element={<RecordsPage />} />
+            <Route path="/records/team" element={<TeamRecordsPage />} />
+            <Route path="/series" element={<SeriesPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

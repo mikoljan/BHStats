@@ -1,15 +1,28 @@
-import { NavLink } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, NavLink, useLocation } from 'react-router';
 import BHLogo from '@/assets/blue-horses.png';
-import { BarChart3, CalendarRange, Shield, Trophy, Users } from 'lucide-react';
+import { BarChart3, CalendarRange, ChevronDown, GitBranch, Shield, Trophy, Users } from 'lucide-react';
 
 export const Header = () => {
-  const navItems = [
+  const location = useLocation();
+  const [recordsMenuOpen, setRecordsMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setRecordsMenuOpen(false);
+  }, [location.pathname]);
+
+  const navItemsBeforeRecords = [
     { path: '/', label: 'Historie', icon: Shield },
     { path: '/players', label: 'Hráči', icon: Users },
     { path: '/matches', label: 'Zápasy', icon: CalendarRange },
-    { path: '/records', label: 'Rekordy', icon: Trophy },
+  ];
+
+  const navItemsAfterRecords = [
+    { path: '/series', label: 'Série', icon: GitBranch },
     { path: '/overview', label: 'Přehled', icon: BarChart3 },
   ];
+
+  const recordsActive = location.pathname.startsWith('/records');
 
   return (
     <header className="sticky top-0 z-40 border-b border-cyan-400/10 bg-slate-950/85 backdrop-blur-xl">
@@ -27,7 +40,66 @@ export const Header = () => {
           </div>
 
           <nav className="flex flex-wrap items-center gap-2">
-            {navItems.map(({ path, label, icon: Icon }) => (
+            {navItemsBeforeRecords.map(({ path, label, icon: Icon }) => (
+              <NavLink
+                key={path}
+                to={path}
+                className={({ isActive }) =>
+                  `flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                    isActive
+                      ? 'bg-cyan-300 text-slate-950 shadow-[0_10px_30px_-14px_rgba(103,232,249,0.9)]'
+                      : 'text-slate-300 hover:bg-white/6 hover:text-white'
+                  }`
+                }
+                end={path === '/' || path === '/overview'}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{label}</span>
+              </NavLink>
+            ))}
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setRecordsMenuOpen((open) => !open)}
+                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+                  recordsActive || recordsMenuOpen
+                    ? 'bg-cyan-300 text-slate-950 shadow-[0_10px_30px_-14px_rgba(103,232,249,0.9)]'
+                    : 'text-slate-300 hover:bg-white/6 hover:text-white'
+                }`}
+              >
+                <Trophy className="h-4 w-4" />
+                <span>Rekordy</span>
+                <ChevronDown className={`h-4 w-4 transition ${recordsMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {recordsMenuOpen ? (
+                <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-[220px] rounded-[24px] border border-white/10 bg-slate-950/95 p-2 shadow-[0_24px_60px_-30px_rgba(2,6,23,0.95)] backdrop-blur-xl">
+                  <Link
+                    to="/records/player"
+                    className={`block rounded-2xl px-4 py-3 text-sm transition ${
+                      location.pathname === '/records/player'
+                        ? 'bg-cyan-300 text-slate-950'
+                        : 'text-slate-200 hover:bg-white/6 hover:text-white'
+                    }`}
+                  >
+                    <div className="font-semibold">Hráčské rekordy</div>
+                  </Link>
+                  <Link
+                    to="/records/team"
+                    className={`mt-1 block rounded-2xl px-4 py-3 text-sm transition ${
+                      location.pathname === '/records/team'
+                        ? 'bg-cyan-300 text-slate-950'
+                        : 'text-slate-200 hover:bg-white/6 hover:text-white'
+                    }`}
+                  >
+                    <div className="font-semibold">Týmové rekordy</div>
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+
+            {navItemsAfterRecords.map(({ path, label, icon: Icon }) => (
               <NavLink
                 key={path}
                 to={path}

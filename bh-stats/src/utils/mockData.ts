@@ -62,42 +62,49 @@ export const players: Player[] = [
     name: 'Stanislav Prokop',
     number: '9',
     position: 'forward',
+    squads: ['A'],
   },
   {
     id: 'jiri-polivka',
     name: 'Jiří Polívka',
     number: '18',
     position: 'forward',
+    squads: ['A', 'B'],
   },
   {
     id: 'jakub-vlcek',
     name: 'Jakub Vlček',
     number: '27',
     position: 'defender',
+    squads: ['A', 'B'],
   },
   {
     id: 'marek-kucera',
     name: 'Marek Kučera',
     number: '1',
     position: 'goalie',
+    squads: ['A', 'B', 'C'],
   },
   {
     id: 'ondrej-simacek',
     name: 'Ondřej Šimáček',
     number: '11',
     position: 'utility',
+    squads: ['B', 'C'],
   },
   {
     id: 'tomas-sedlacek',
     name: 'Tomáš Sedláček',
     number: '14',
     position: 'forward',
+    squads: ['C'],
   },
 ];
 
 export const matches: Match[] = [
   {
     id: 'bh-vs-falcons-2023-11-12',
+    squad: 'A',
     stadiumId: 'vodova-arena',
     date: '2023-11-12',
     opponent: 'Brno Falcons',
@@ -227,6 +234,7 @@ export const matches: Match[] = [
   },
   {
     id: 'bh-vs-wolves-2024-02-04',
+    squad: 'B',
     stadiumId: 'jih-rink',
     date: '2024-02-04',
     opponent: 'South Wolves',
@@ -303,6 +311,7 @@ export const matches: Match[] = [
   },
   {
     id: 'bh-vs-ravens-2024-09-15',
+    squad: 'B',
     stadiumId: 'horses-dome',
     date: '2024-09-15',
     opponent: 'Prague Ravens',
@@ -412,6 +421,7 @@ export const matches: Match[] = [
   },
   {
     id: 'bh-vs-titans-2024-11-03',
+    squad: 'A',
     stadiumId: 'vodova-arena',
     date: '2024-11-03',
     opponent: 'Olomouc Titans',
@@ -530,6 +540,7 @@ export const matches: Match[] = [
   },
   {
     id: 'bh-vs-comets-2025-01-19',
+    squad: 'C',
     stadiumId: 'horses-dome',
     date: '2025-01-19',
     opponent: 'Zlín Comets',
