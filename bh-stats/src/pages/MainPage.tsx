@@ -1,52 +1,37 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Table } from '@components/Table';
 import { ScopeTabs, type TeamScope } from '@components/UI/ScopeTabs';
-import { getMatches, getPlayers, getSeasons } from '@utils/api';
+import { getOverview } from '@utils/api';
 import { formatDate } from '@utils/helpers';
-import {
-  filterMatchesByScope,
-  filterPlayersByScope,
-  getGoalMilestones,
-  getPlayerStats,
-  getSeasonHistory,
-  getTeamRecordSummary,
-  scopeLabel,
-} from '@utils/statistics';
-import type { Match } from '@models/match';
-import type { Player } from '@models/player';
-import type { Season } from '@models/season';
+import { scopeLabel, type PlayerStatLine } from '@utils/statistics';
+import type { OverviewResponse } from '@utils/api';
+
+const movementLabel = {
+  promotion: 'Postup',
+  relegation: 'Sestup',
+} as const;
 
 export const MainPage = () => {
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [overviewData, setOverviewData] = useState<OverviewResponse | null>(null);
   const [scope, setScope] = useState<TeamScope>('ALL');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
-      const [nextMatches, nextPlayers, nextSeasons] = await Promise.all([
-        getMatches(),
-        getPlayers(),
-        getSeasons(),
-      ]);
-
-      setMatches(nextMatches);
-      setPlayers(nextPlayers);
-      setSeasons(nextSeasons);
+      setLoading(true);
+      const nextOverview = await getOverview(scope, 'ALL');
+      setOverviewData(nextOverview);
       setLoading(false);
     };
 
     void load();
-  }, []);
+  }, [scope]);
 
-  const filteredMatches = useMemo(() => filterMatchesByScope(matches, scope), [matches, scope]);
-  const filteredPlayers = useMemo(() => filterPlayersByScope(players, scope), [players, scope]);
-  const overview = getTeamRecordSummary(filteredMatches);
-  const playerStats = getPlayerStats(filteredPlayers, filteredMatches);
-  const seasonHistory = getSeasonHistory(seasons, filteredMatches).filter((row) => row.matches > 0);
-  const milestones = useMemo(() => getGoalMilestones(filteredMatches), [filteredMatches]);
-  const topScorer = playerStats[0];
+  const overview = overviewData?.teamRecordSummary ?? overviewData?.summary;
+  const seasonHistory = overviewData?.seasonHistory ?? [];
+  const milestones = overviewData?.milestones ?? [];
+  const topPlayers = overviewData?.topPlayers ?? [];
+  const topScorer = overviewData?.topPlayers?.[0];
 
   if (loading) {
     return <div className="panel-soft p-8 text-slate-300">Načítám historii týmu…</div>;
@@ -70,8 +55,8 @@ export const MainPage = () => {
           <div className="grid min-w-[280px] gap-3 sm:grid-cols-2 xl:w-[360px]">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Celek {scopeLabel[scope]}</div>
-              <div className="mt-2 text-2xl font-bold text-white">{overview.matches} Z</div>
-              <div className="mt-1 text-sm text-slate-300">{overview.wins}-{overview.draws}-{overview.losses} • skóre {overview.goalsFor}:{overview.goalsAgainst}</div>
+              <div className="mt-2 text-2xl font-bold text-white">{overview?.matches ?? 0} Z</div>
+              <div className="mt-1 text-sm text-slate-300">{overview?.wins ?? 0}-{overview?.draws ?? 0}-{overview?.losses ?? 0} • skóre {overview?.goalsFor ?? 0}:{overview?.goalsAgainst ?? 0}</div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Lídr kanadského bodování</div>
@@ -112,7 +97,10 @@ export const MainPage = () => {
               {
                 key: 'position',
                 header: 'Umístění',
-                render: (row) => (row.season.position ? `${row.season.position}. místo` : row.season.covidInterrupted ? 'COVID' : 'n/a'),
+                render: (row) => {
+                  const baseLabel = row.season.position ? `${row.season.position}. místo` : row.season.covidInterrupted ? 'COVID' : 'n/a';
+                  return row.season.movement ? `${baseLabel} • ${movementLabel[row.season.movement]}` : baseLabel;
+                },
               },
             ]}
             data={seasonHistory}
@@ -149,7 +137,7 @@ export const MainPage = () => {
             <h2 className="section-title">Nejlepší hráči all-time</h2>
           </div>
           <div className="panel-soft p-4 sm:p-5">
-            <Table
+            <Table<PlayerStatLine>
               columns={[
                 { key: 'rank', header: '#', render: (_, index) => index + 1 },
                 { key: 'player', header: 'Jméno', render: (row) => row.player.name },
@@ -160,7 +148,7 @@ export const MainPage = () => {
                 { key: 'tm', header: 'TM', render: (row) => row.penaltyMinutes },
                 { key: 'avg', header: 'Pr. B/Z', render: (row) => row.pointsPerGame.toFixed(2).replace('.', ',') },
               ]}
-              data={playerStats.slice(0, 8)}
+              data={topPlayers.slice(0, 8)}
               rowKey={(row) => row.player.id}
             />
           </div>

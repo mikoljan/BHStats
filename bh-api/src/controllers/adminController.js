@@ -6,6 +6,7 @@ import Season from "../models/seasonModel.js";
 import Stadium from "../models/stadiumModel.js";
 import Team from "../models/teamModel.js";
 
+// Deletes every stored entity so the database can be reset quickly.
 export async function deleteAllData(req, res) {
 	try {
 		const [goals, penalties, matches, players, seasons, stadiums, teams] = await Promise.all([

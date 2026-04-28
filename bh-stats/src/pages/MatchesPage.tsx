@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { PenSquare } from 'lucide-react';
+import { Import, PenSquare, PlusCircle } from 'lucide-react';
 import { StatCard } from '@components/StatCard';
 import { Table } from '@components/Table';
 import { getMatches, getSeasons, getStadiums } from '@utils/api';
@@ -43,12 +43,31 @@ export const MatchesPage = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="eyebrow">Zápasy</p>
-        <h1 className="section-title text-4xl">Historie zápasů a odkaz do detailu</h1>
-        <p className="mt-3 max-w-2xl text-slate-300">
-          Každý zápas má přímý link do detailu, kde je možné upravit skóre, sestavu, góly i tresty bez backendu.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="eyebrow">Zápasy</p>
+          <h1 className="section-title text-4xl">Historie zápasů a odkaz do detailu</h1>
+          <p className="mt-3 max-w-2xl text-slate-300">
+            Každý zápas má přímý link do detailu, kde je možné upravit skóre, sestavu, góly i tresty přes backend.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            to="/seasons/create"
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/6 hover:text-white"
+          >
+            <PlusCircle className="h-4 w-4" />
+            Nová sezóna
+          </Link>
+          <Link
+            to="/matches/import"
+            className="inline-flex items-center gap-2 rounded-full bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
+          >
+            <Import className="h-4 w-4" />
+            Import z linku
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">

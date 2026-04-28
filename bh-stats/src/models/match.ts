@@ -11,6 +11,7 @@ export interface Goal {
   time: number;
   scorerId: string | null;
   assistId: string | null;
+  goalieId: string | null;
   matchId: string;
   ourTeam: boolean;
   winningGoal: boolean;

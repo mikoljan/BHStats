@@ -8,12 +8,105 @@ import type { Player } from '@models/player';
 import type { Season } from '@models/season';
 import type { Stadium } from '@models/stadium';
 
+const formatClockValue = (value: number) => {
+  const safeValue = Math.max(0, Math.floor(value));
+  const minutes = Math.floor(safeValue / 60);
+  const seconds = safeValue % 60;
+
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+};
+
+const parseClockValue = (value: string) => {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const match = normalizedValue.match(/^(\d+):(\d{2})$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const minutes = Number(match[1]);
+  const seconds = Number(match[2]);
+
+  if (!Number.isFinite(minutes) || !Number.isFinite(seconds) || seconds >= 60) {
+    return null;
+  }
+
+  return minutes * 60 + seconds;
+};
+
+const TimeInput = ({
+  value,
+  onChange,
+  storageUnit = 'seconds',
+}: {
+  value: number;
+  onChange: (nextValue: number) => void;
+  storageUnit?: 'seconds' | 'minutes';
+}) => {
+  const toDisplayValue = (rawValue: number) => {
+    const secondsValue = storageUnit === 'minutes' ? Math.round(rawValue * 60) : rawValue;
+    return formatClockValue(secondsValue);
+  };
+
+  const fromDisplayValue = (rawValue: string) => {
+    const parsedSeconds = parseClockValue(rawValue);
+
+    if (parsedSeconds === null) {
+      return null;
+    }
+
+    return storageUnit === 'minutes' ? parsedSeconds / 60 : parsedSeconds;
+  };
+
+  const [draftValue, setDraftValue] = useState(() => toDisplayValue(value));
+
+  useEffect(() => {
+    setDraftValue(toDisplayValue(value));
+  }, [storageUnit, value]);
+
+  const commitValue = () => {
+    const parsedValue = fromDisplayValue(draftValue);
+
+    if (parsedValue === null) {
+      setDraftValue(toDisplayValue(value));
+      return;
+    }
+
+    onChange(parsedValue);
+    setDraftValue(toDisplayValue(parsedValue));
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      value={draftValue}
+      onChange={(event) => setDraftValue(event.target.value)}
+      onBlur={commitValue}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          commitValue();
+        }
+      }}
+      placeholder="mm:ss"
+      title="Zadej čas ve formátu mm:ss"
+    />
+  );
+};
+
 const emptyGoal = (matchId: string): Goal => ({
   id: `goal-${crypto.randomUUID()}`,
   type: 'even strength',
   time: 0,
   scorerId: null,
   assistId: null,
+  goalieId: null,
   matchId,
   ourTeam: true,
   winningGoal: false,
@@ -51,6 +144,40 @@ export const MatchDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
+
+  const availableGoaliePlayers = match
+    ? players.filter((player) => match.presentPlayerIds.includes(player.id))
+    : [];
+
+  const getGoalieOptions = (selectedPlayerId: string) => {
+    const basePlayers = availableGoaliePlayers.length > 0 ? availableGoaliePlayers : players;
+    const selectedPlayer = players.find((player) => player.id === selectedPlayerId);
+
+    if (selectedPlayer && !basePlayers.some((player) => player.id === selectedPlayer.id)) {
+      return [selectedPlayer, ...basePlayers];
+    }
+
+    return basePlayers;
+  };
+
+  const getConcededGoalieOptions = (selectedPlayerId: string | null) => {
+    if (!match) {
+      return [];
+    }
+
+    const goalieIds = Array.from(new Set(match.goalieMinutes.map((entry) => entry.playerId).filter(Boolean)));
+    const basePlayers = goalieIds
+      .map((playerId) => players.find((player) => player.id === playerId))
+      .filter((player): player is Player => Boolean(player));
+
+    const selectedPlayer = selectedPlayerId ? players.find((player) => player.id === selectedPlayerId) : undefined;
+
+    if (selectedPlayer && !basePlayers.some((player) => player.id === selectedPlayer.id)) {
+      return [selectedPlayer, ...basePlayers];
+    }
+
+    return basePlayers;
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -113,9 +240,11 @@ export const MatchDetailPage = () => {
         return current;
       }
 
+      const normalizedPatch = patch.ourTeam === true ? { ...patch, goalieId: null } : patch;
+
       return {
         ...current,
-        goals: current.goals.map((goal) => (goal.id === goalId ? { ...goal, ...patch } : goal)),
+        goals: current.goals.map((goal) => (goal.id === goalId ? { ...goal, ...normalizedPatch } : goal)),
       };
     });
   };
@@ -188,7 +317,8 @@ export const MatchDetailPage = () => {
   };
 
   const addGoalie = () => {
-    const firstGoalie = players.find((player) => player.position === 'goalie')?.id ?? players[0]?.id ?? '';
+    const candidatePlayers = availableGoaliePlayers.length > 0 ? availableGoaliePlayers : players;
+    const firstGoalie = candidatePlayers.find((player) => player.position === 'goalie')?.id ?? candidatePlayers[0]?.id ?? '';
     setMatch((current) =>
       current
         ? {
@@ -361,9 +491,7 @@ export const MatchDetailPage = () => {
                     value={goalieEntry.playerId}
                     onChange={(event) => updateGoalieMinutes(index, event.target.value, goalieEntry.minutesPlayed)}
                   >
-                    {players
-                      .filter((player) => player.position === 'goalie')
-                      .map((player) => (
+                    {getGoalieOptions(goalieEntry.playerId).map((player) => (
                         <option key={player.id} value={player.id}>
                           {player.name}
                         </option>
@@ -372,11 +500,10 @@ export const MatchDetailPage = () => {
                 </label>
                 <label className="form-field compact">
                   <span>Minuty</span>
-                  <input
-                    type="number"
-                    min={0}
+                  <TimeInput
                     value={goalieEntry.minutesPlayed}
-                    onChange={(event) => updateGoalieMinutes(index, goalieEntry.playerId, Number(event.target.value))}
+                    storageUnit="minutes"
+                    onChange={(nextValue) => updateGoalieMinutes(index, goalieEntry.playerId, nextValue)}
                   />
                 </label>
                 <button type="button" onClick={() => removeGoalie(index)} className="mt-auto inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-rose-200 transition hover:bg-rose-400/10">
@@ -438,7 +565,7 @@ export const MatchDetailPage = () => {
                   </label>
                   <label className="form-field compact">
                     <span>Čas</span>
-                    <input type="number" min={0} value={goal.time} onChange={(event) => updateGoal(goal.id, { time: Number(event.target.value) })} />
+                    <TimeInput value={goal.time} onChange={(nextValue) => updateGoal(goal.id, { time: nextValue })} />
                   </label>
                   <label className="form-field compact">
                     <span>Střelec</span>
@@ -462,6 +589,22 @@ export const MatchDetailPage = () => {
                       ))}
                     </select>
                   </label>
+                  {!goal.ourTeam ? (
+                    <label className="form-field compact md:col-span-2">
+                      <span>Obdržený gól - náš gólman</span>
+                      <select
+                        value={goal.goalieId ?? ''}
+                        onChange={(event) => updateGoal(goal.id, { goalieId: event.target.value || null })}
+                      >
+                        <option value="">Neuveden</option>
+                        {getConcededGoalieOptions(goal.goalieId).map((player) => (
+                          <option key={player.id} value={player.id}>
+                            {player.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   <label className="inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-3 text-sm text-slate-200">
@@ -510,12 +653,7 @@ export const MatchDetailPage = () => {
                   </label>
                   <label className="form-field compact">
                     <span>Čas</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={penalty.time}
-                      onChange={(event) => updatePenaltyEntry(penalty.id, { time: Number(event.target.value) })}
-                    />
+                    <TimeInput value={penalty.time} onChange={(nextValue) => updatePenaltyEntry(penalty.id, { time: nextValue })} />
                   </label>
                   <label className="form-field compact">
                     <span>Hráč</span>

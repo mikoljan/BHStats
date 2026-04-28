@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CircleOff, GitBranch, Goal, Search, ShieldAlert } from 'lucide-react';
 import { ScopeTabs, type TeamScope } from '@components/UI/ScopeTabs';
-import { seriesMatrices, type SeriesCellState, type SeriesMatrix } from '@utils/seriesMatrix';
+import { getSeries } from '@utils/api';
+import type { SeriesCellState, SeriesMatrix } from '@utils/seriesMatrix';
 
 const legend = [
   {
@@ -57,15 +58,11 @@ const scopeHeadline: Record<TeamScope, string> = {
   A: 'Série týmu A',
   B: 'Série týmu B',
   C: 'Série týmu C',
-  ALL: 'Souhrn sérií',
+  ALL: 'Série všech týmů',
 };
 
 const getEmptyState = (scope: TeamScope) => {
-  if (scope === 'ALL') {
-    return 'Souhrnná matice A+B+C ve stats.txt zatím není. Stránka je připravená na jednotlivé týmové přehledy.';
-  }
-
-  return `Ve stats.txt zatím není rozepsaná sekce ${scope}-Série, takže pro tenhle tým teď není co vykreslit.`;
+  return `Nepovedlo se načíst data pro tým ${scope}.`;
 };
 
 const SummaryCards = ({ matrix }: { matrix: SeriesMatrix }) => (
@@ -98,9 +95,24 @@ const SummaryCards = ({ matrix }: { matrix: SeriesMatrix }) => (
 export const SeriesPage = () => {
   const [scope, setScope] = useState<TeamScope>('A');
   const [search, setSearch] = useState('');
+  const [matrix, setMatrix] = useState<SeriesMatrix | undefined>(undefined);
+  const deferredSearch = useDeferredValue(search);
 
-  const matrix = scope === 'ALL' ? undefined : seriesMatrices[scope];
-  const normalizedSearch = search.trim().toLocaleLowerCase('cs');
+  useEffect(() => {
+    const load = async () => {
+      if (scope === 'ALL') {
+        setMatrix(undefined);
+        return;
+      }
+
+      const nextMatrix = await getSeries(scope);
+      setMatrix(nextMatrix);
+    };
+
+    void load();
+  }, [scope]);
+
+  const normalizedSearch = deferredSearch.trim().toLocaleLowerCase('cs');
   const visibleRows = useMemo(() => {
     if (!matrix) {
       return [];
@@ -140,7 +152,7 @@ export const SeriesPage = () => {
           </div>
 
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <ScopeTabs value={scope} onChange={setScope} />
+            <ScopeTabs value={scope} onChange={setScope} hideAllOption />
 
             <label className="flex w-full max-w-md items-center gap-3 rounded-full border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-slate-300">
               <Search className="h-4 w-4 text-slate-400" />

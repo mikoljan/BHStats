@@ -6,6 +6,7 @@ const goalSchema = new mongoose.Schema({
     time: { type: Number, required: true, default: 0 },
     scorer: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' },
     assist: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' },
+    goalie: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' },
     match: { type: mongoose.Schema.Types.ObjectId, ref: 'Match' },
     // Indicate if the event is for our team
     ourTeam: { type: Boolean, required: true },

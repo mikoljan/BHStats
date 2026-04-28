@@ -15,10 +15,11 @@ export interface RecordBookRow {
   time?: string;
   date?: string;
   period?: string;
+  [key: string]: string | number | undefined;
 }
 
 export interface RecordBookColumn {
-  key: keyof RecordBookRow;
+  key: string;
   header: string;
   className?: string;
 }

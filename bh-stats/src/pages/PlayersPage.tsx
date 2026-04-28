@@ -3,19 +3,18 @@ import { Link } from 'react-router';
 import { Search } from 'lucide-react';
 import { Table } from '@components/Table';
 import { ScopeTabs, type TeamScope } from '@components/UI/ScopeTabs';
-import { getMatches, getPlayers, getSeasons } from '@utils/api';
+import { getGoalieStatistics, getPlayerStatistics, getSeasons } from '@utils/api';
 import { formatMinutes } from '@utils/helpers';
-import { filterMatchesByScope, filterPlayersByScope, getGoalieStats, getPlayerStats, positionLabel, scopeLabel } from '@utils/statistics';
-import type { Match } from '@models/match';
-import type { Player } from '@models/player';
+import type { TableColumn } from '@components/Table';
+import { positionLabel, scopeLabel, type GoalieStatLine, type PlayerStatLine } from '@utils/statistics';
 import type { Season } from '@models/season';
 
 type FilterMode = 'ALL' | 'SEASON' | 'LEAGUE';
 type StatsView = 'PLAYERS' | 'GOALIES';
 
 export const PlayersPage = () => {
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [players, setPlayers] = useState<Player[]>([]);
+  const [rows, setRows] = useState<PlayerStatLine[]>([]);
+  const [goalieRows, setGoalieRows] = useState<GoalieStatLine[]>([]);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<TeamScope>('ALL');
@@ -27,24 +26,45 @@ export const PlayersPage = () => {
   const deferredQuery = useDeferredValue(query);
 
   useEffect(() => {
-    const load = async () => {
-      const [nextMatches, nextPlayers, nextSeasons] = await Promise.all([getMatches(), getPlayers(), getSeasons()]);
-      setMatches(nextMatches);
-      setPlayers(nextPlayers);
+    const loadSeasons = async () => {
+      const nextSeasons = await getSeasons();
       setSeasons(nextSeasons);
+    };
+
+    void loadSeasons();
+  }, []);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      setLoading(true);
+      const seasonFilter = filterMode === 'SEASON' && seasonId !== 'ALL' ? seasonId : undefined;
+      const leagueFilter = filterMode === 'LEAGUE' && leagueName !== 'ALL' ? leagueName : undefined;
+
+      const [nextRows, nextGoalieRows] = await Promise.all([
+        getPlayerStatistics({
+          scope,
+          seasonId: seasonFilter,
+          leagueName: leagueFilter,
+          query: deferredQuery.trim() || undefined,
+        }),
+        getGoalieStatistics({
+          scope,
+          seasonId: seasonFilter,
+          leagueName: leagueFilter,
+          query: deferredQuery.trim() || undefined,
+        }),
+      ]);
+
+      setRows(nextRows);
+      setGoalieRows(nextGoalieRows);
       setLoading(false);
     };
 
-    void load();
-  }, []);
+    void loadStats();
+  }, [deferredQuery, filterMode, leagueName, scope, seasonId]);
 
   const seasonOptions = useMemo(
     () => [...seasons].sort((left, right) => right.year.localeCompare(left.year, 'cs')),
-    [seasons],
-  );
-
-  const seasonLookup = useMemo(
-    () => new Map(seasons.map((season) => [season.id, season])),
     [seasons],
   );
 
@@ -53,48 +73,116 @@ export const PlayersPage = () => {
     [seasons],
   );
 
-  const filteredMatches = useMemo(() => {
-    const scopedMatches = filterMatchesByScope(matches, scope);
-    return scopedMatches.filter((match) => {
-      if (filterMode === 'SEASON') {
-        return seasonId === 'ALL' ? true : match.seasonId === seasonId;
-      }
+  const playerColumns = useMemo<TableColumn<PlayerStatLine>[]>(() => [
+    {
+      key: 'rank',
+      header: '#',
+      headerTooltip: 'Pořadí v aktuálním řazení',
+      className: 'w-16 text-slate-400',
+      render: (_, index) => index + 1,
+      sortable: true,
+      sortValue: (row) => row.points,
+    },
+    {
+      key: 'player',
+      header: 'Hráč',
+      headerTooltip: 'Jméno hráče a jeho základní profil',
+      render: (row) => (
+        <div>
+          <Link to={`/players/${row.player.id}`} className="font-semibold text-white transition hover:text-cyan-200">
+            {row.player.name}
+          </Link>
+          <div className="text-xs text-slate-400">#{row.player.number} • {positionLabel[row.player.position]}</div>
+        </div>
+      ),
+      sortable: true,
+      sortValue: (row) => row.player.name,
+    },
+    { key: 'matches', header: 'Z', headerTooltip: 'Zápasy', render: (row) => row.matches, sortable: true, sortValue: (row) => row.matches },
+    { key: 'goals', header: 'G', headerTooltip: 'Góly', render: (row) => row.goals, sortable: true, sortValue: (row) => row.goals },
+    { key: 'assists', header: 'A', headerTooltip: 'Asistence', render: (row) => row.assists, sortable: true, sortValue: (row) => row.assists },
+    { key: 'points', header: 'B', headerTooltip: 'Body', render: (row) => row.points, sortable: true, sortValue: (row) => row.points },
+    { key: 'pim', header: 'TM', headerTooltip: 'Trestné minuty', render: (row) => row.penaltyMinutes, sortable: true, sortValue: (row) => row.penaltyMinutes },
+    {
+      key: 'avg',
+      header: 'Pr. B/Z',
+      headerTooltip: 'Průměr bodů na zápas',
+      render: (row) => row.pointsPerGame.toFixed(2).replace('.', ','),
+      sortable: true,
+      sortValue: (row) => row.pointsPerGame,
+    },
+    { key: 'ppg', header: 'PPG', headerTooltip: 'Góly v přesilovce', render: (row) => row.powerPlayGoals, sortable: true, sortValue: (row) => row.powerPlayGoals },
+    { key: 'shg', header: 'SHG', headerTooltip: 'Góly v oslabení', render: (row) => row.shorthandedGoals, sortable: true, sortValue: (row) => row.shorthandedGoals },
+    { key: 'gwg', header: 'GWG', headerTooltip: 'Vítězné góly', render: (row) => row.gameWinningGoals, sortable: true, sortValue: (row) => row.gameWinningGoals },
+    { key: 'gtg', header: 'GTG', headerTooltip: 'Vyrovnávací góly', render: (row) => row.gameTyingGoals, sortable: true, sortValue: (row) => row.gameTyingGoals },
+    { key: 'psg', header: 'PSG', headerTooltip: 'Góly z trestného střílení', render: (row) => row.penaltyShotGoals, sortable: true, sortValue: (row) => row.penaltyShotGoals },
+    { key: 'eng', header: 'ENG', headerTooltip: 'Góly do prázdné brány', render: (row) => row.emptyNetGoals, sortable: true, sortValue: (row) => row.emptyNetGoals },
+  ], []);
 
-      if (filterMode === 'LEAGUE') {
-        if (leagueName === 'ALL') {
-          return true;
-        }
-
-        return seasonLookup.get(match.seasonId)?.leagueName === leagueName;
-      }
-
-      return true;
-    });
-  }, [filterMode, leagueName, matches, scope, seasonId, seasonLookup]);
-
-  const filteredPlayers = useMemo(() => filterPlayersByScope(players, scope), [players, scope]);
-
-  const rows = useMemo(() => {
-    const allRows = getPlayerStats(filteredPlayers, filteredMatches);
-    const normalized = deferredQuery.trim().toLocaleLowerCase('cs');
-
-    if (!normalized) {
-      return allRows;
-    }
-
-    return allRows.filter((row) => row.player.name.toLocaleLowerCase('cs').includes(normalized));
-  }, [deferredQuery, filteredMatches, filteredPlayers]);
-
-  const goalieRows = useMemo(() => {
-    const allRows = getGoalieStats(filteredPlayers, filteredMatches);
-    const normalized = deferredQuery.trim().toLocaleLowerCase('cs');
-
-    if (!normalized) {
-      return allRows;
-    }
-
-    return allRows.filter((row) => row.player.name.toLocaleLowerCase('cs').includes(normalized));
-  }, [deferredQuery, filteredMatches, filteredPlayers]);
+  const goalieColumns = useMemo<TableColumn<GoalieStatLine>[]>(() => [
+    {
+      key: 'rank',
+      header: '#',
+      headerTooltip: 'Pořadí v aktuálním řazení',
+      className: 'w-16 text-slate-400',
+      render: (_, index) => index + 1,
+      sortable: true,
+      sortValue: (row) => row.wins,
+    },
+    {
+      key: 'player',
+      header: 'Jméno',
+      headerTooltip: 'Jméno brankáře',
+      render: (row) => (
+        <div>
+          <Link to={`/players/${row.player.id}`} className="font-semibold text-white transition hover:text-cyan-200">
+            {row.player.name}
+          </Link>
+          <div className="text-xs text-slate-400">#{row.player.number} • v brance</div>
+        </div>
+      ),
+      sortable: true,
+      sortValue: (row) => row.player.name,
+    },
+    { key: 'matches', header: 'Z', headerTooltip: 'Zápasy', render: (row) => row.matches, sortable: true, sortValue: (row) => row.matches },
+    { key: 'wins', header: 'V', headerTooltip: 'Výhry', render: (row) => row.wins, sortable: true, sortValue: (row) => row.wins },
+    { key: 'cleanSheets', header: 'ČK', headerTooltip: 'Čistá konta', render: (row) => row.cleanSheets, sortable: true, sortValue: (row) => row.cleanSheets },
+    { key: 'minutes', header: 'Min', headerTooltip: 'Odchytané minuty', render: (row) => formatMinutes(row.minutes), sortable: true, sortValue: (row) => row.minutes },
+    {
+      key: 'ga',
+      header: 'OB',
+      headerTooltip: 'Obdržené branky',
+      render: (row) => row.goalsAgainst,
+      sortable: true,
+      sortValue: (row) => row.goalsAgainst,
+    },
+    {
+      key: 'gaa',
+      header: 'B/Z',
+      headerTooltip: 'Průměr obdržených branek na zápas',
+      render: (row) => row.goalsAgainstPerGame.toFixed(2).replace('.', ','),
+      sortable: true,
+      sortValue: (row) => row.goalsAgainstPerGame,
+    },
+    { key: 'assists', header: 'A', headerTooltip: 'Asistence', render: (row) => row.assists, sortable: true, sortValue: (row) => row.assists },
+    { key: 'shootouts', header: 'Nájezdy', headerTooltip: 'Počet samostatných nájezdů', render: (row) => row.shootouts, sortable: true, sortValue: (row) => row.shootouts },
+    {
+      key: 'shootoutGoalsAgainst',
+      header: 'Góly z náj.',
+      headerTooltip: 'Obdržené góly ze samostatných nájezdů',
+      render: (row) => row.shootoutGoalsAgainst,
+      sortable: true,
+      sortValue: (row) => row.shootoutGoalsAgainst,
+    },
+    {
+      key: 'shootoutSavePercentage',
+      header: 'Úspěšnost (%)',
+      headerTooltip: 'Úspěšnost zákroků při samostatných nájezdech v procentech',
+      render: (row) => (row.shootoutSavePercentage === null ? '—' : row.shootoutSavePercentage.toFixed(2).replace('.', ',')),
+      sortable: true,
+      sortValue: (row) => row.shootoutSavePercentage,
+    },
+  ], []);
 
   if (loading) {
     return <div className="panel-soft p-8 text-slate-300">Načítám hráčské statistiky…</div>;
@@ -204,41 +292,11 @@ export const PlayersPage = () => {
           </div>
 
           <Table
-            columns={[
-              {
-                key: 'rank',
-                header: '#',
-                className: 'w-16 text-slate-400',
-                render: (_, index) => index + 1,
-              },
-              {
-                key: 'player',
-                header: 'Hráč',
-                render: (row) => (
-                  <div>
-                    <Link to={`/players/${row.player.id}`} className="font-semibold text-white transition hover:text-cyan-200">
-                      {row.player.name}
-                    </Link>
-                    <div className="text-xs text-slate-400">#{row.player.number} • {positionLabel[row.player.position]}</div>
-                  </div>
-                ),
-              },
-              { key: 'matches', header: 'Z', render: (row) => row.matches },
-              { key: 'goals', header: 'G', render: (row) => row.goals },
-              { key: 'assists', header: 'A', render: (row) => row.assists },
-              { key: 'points', header: 'B', render: (row) => row.points },
-              { key: 'pim', header: 'TM', render: (row) => row.penaltyMinutes },
-              { key: 'avg', header: 'Pr. B/Z', render: (row) => row.pointsPerGame.toFixed(2).replace('.', ',') },
-              { key: 'ppg', header: 'PPG', render: (row) => row.powerPlayGoals },
-              { key: 'shg', header: 'SHG', render: (row) => row.shorthandedGoals },
-              { key: 'gwg', header: 'GWG', render: (row) => row.gameWinningGoals },
-              { key: 'gtg', header: 'GTG', render: (row) => row.gameTyingGoals },
-              { key: 'psg', header: 'PSG', render: (row) => row.penaltyShotGoals },
-              { key: 'eng', header: 'ENG', render: (row) => row.emptyNetGoals },
-            ]}
+            columns={playerColumns}
             data={rows}
             rowKey={(row) => row.player.id}
             emptyState="Žádný hráč neodpovídá filtru."
+            defaultSort={{ columnKey: 'points', direction: 'desc' }}
           />
         </section>
       ) : (
@@ -252,43 +310,11 @@ export const PlayersPage = () => {
           </div>
 
           <Table
-            columns={[
-              {
-                key: 'rank',
-                header: '#',
-                className: 'w-16 text-slate-400',
-                render: (_, index) => index + 1,
-              },
-              {
-                key: 'player',
-                header: 'Jméno',
-                render: (row) => (
-                  <div>
-                    <Link to={`/players/${row.player.id}`} className="font-semibold text-white transition hover:text-cyan-200">
-                      {row.player.name}
-                    </Link>
-                    <div className="text-xs text-slate-400">#{row.player.number} • v brance</div>
-                  </div>
-                ),
-              },
-              { key: 'matches', header: 'Z', render: (row) => row.matches },
-              { key: 'wins', header: 'V', render: (row) => row.wins },
-              { key: 'cleanSheets', header: 'ČK', render: (row) => row.cleanSheets },
-              { key: 'minutes', header: 'Min', render: (row) => formatMinutes(row.minutes) },
-              { key: 'ga', header: 'OB', render: (row) => row.goalsAgainst.toFixed(2).replace('.', ',') },
-              { key: 'gaa', header: 'B/Z', render: (row) => row.goalsAgainstPerGame.toFixed(2).replace('.', ',') },
-              { key: 'assists', header: 'A', render: (row) => row.assists },
-              { key: 'shootouts', header: 'Nájezdy', render: (row) => row.shootouts },
-              { key: 'shootoutGoalsAgainst', header: 'Góly z náj.', render: (row) => row.shootoutGoalsAgainst },
-              {
-                key: 'shootoutSavePercentage',
-                header: 'Úspěšnost (%)',
-                render: (row) => (row.shootoutSavePercentage === null ? '—' : row.shootoutSavePercentage.toFixed(2).replace('.', ',')),
-              },
-            ]}
+            columns={goalieColumns}
             data={goalieRows}
             rowKey={(row) => `${row.player.id}-goalie`}
             emptyState="Žádný brankář neodpovídá filtru."
+            defaultSort={{ columnKey: 'wins', direction: 'desc' }}
           />
         </section>
       )}

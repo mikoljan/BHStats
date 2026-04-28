@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Clock3, Medal, Sparkles, Star, Zap } from 'lucide-react';
 import { Table } from '@components/Table';
 import { ScopeTabs, type TeamScope } from '@components/UI/ScopeTabs';
-import { detailedRecordSections, recordHeroStats, type RecordBookIconName, type RecordBookRow } from '@utils/recordsBookData';
+import { getPlayerRecordBook, type PlayerRecordBookResponse } from '@utils/api';
+import type { RecordBookIconName, RecordBookRow } from '@utils/recordsBookData';
 
 const iconMap: Record<RecordBookIconName, typeof Medal> = {
   zap: Zap,
@@ -12,11 +13,51 @@ const iconMap: Record<RecordBookIconName, typeof Medal> = {
   clock: Clock3,
 };
 
-const readCell = (row: RecordBookRow, key: keyof RecordBookRow) => row[key] ?? '—';
+const readCell = (row: RecordBookRow, key: string) => row[key] ?? '—';
+
+const getSectionGridClassName = (gridClassName: string, tableCount: number) => {
+  if (tableCount <= 1) {
+    return 'grid-cols-1';
+  }
+
+  if (gridClassName.includes('grid-cols-3')) {
+    return 'grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3';
+  }
+
+  return 'grid-cols-1 xl:grid-cols-2';
+};
+
+const getTableCardClassName = (columnCount: number, rowCount: number) => {
+  const isWide = columnCount >= 5 || rowCount >= 12;
+  const isMedium = columnCount >= 4 || rowCount >= 8;
+
+  if (isWide) {
+    return 'xl:col-span-2';
+  }
+
+  if (isMedium) {
+    return '2xl:col-span-2';
+  }
+
+  return '';
+};
 
 export const RecordsPage = () => {
   const [scope, setScope] = useState<TeamScope>('A');
-  const hasDetailedData = scope === 'A';
+  const [recordBook, setRecordBook] = useState<PlayerRecordBookResponse | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      const nextRecordBook = await getPlayerRecordBook(scope);
+      setRecordBook(nextRecordBook);
+    };
+
+    void load();
+  }, [scope]);
+
+  const heroStats = recordBook?.heroStats ?? [];
+  const sections = recordBook?.sections ?? [];
+  const hasDetailedData = sections.length > 0;
 
   return (
     <div className="space-y-8">
@@ -35,8 +76,8 @@ export const RecordsPage = () => {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[520px]">
-            {recordHeroStats[scope].map((item) => (
+          <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[520px] xl:grid-cols-4">
+            {heroStats.map((item) => (
               <article key={item.label} className="rounded-[28px] border border-white/10 bg-slate-950/55 px-4 py-4 backdrop-blur">
                 <div className="text-xs uppercase tracking-[0.24em] text-slate-400">{item.label}</div>
                 <div className="mt-2 text-3xl font-bold text-white">{item.value}</div>
@@ -48,7 +89,7 @@ export const RecordsPage = () => {
       </section>
 
       {hasDetailedData ? (
-        detailedRecordSections.map((section) => (
+        sections.map((section) => (
           <section key={section.key} className="panel-soft p-5 sm:p-6">
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -58,12 +99,13 @@ export const RecordsPage = () => {
               <p className="max-w-3xl text-sm text-slate-300">{section.description}</p>
             </div>
 
-            <div className={`grid gap-6 ${section.gridClassName}`}>
+            <div className={`grid gap-6 ${getSectionGridClassName(section.gridClassName, section.tables.length)}`}>
               {section.tables.map((table) => {
                 const Icon = iconMap[table.iconName];
+                const tableCardClassName = getTableCardClassName(table.columns.length, table.rows.length);
 
                 return (
-                  <article key={table.key} className="overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/45">
+                  <article key={table.key} className={`overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/45 ${tableCardClassName}`}>
                     <div className={`bg-gradient-to-r ${table.accentClassName} px-5 py-4`}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -99,8 +141,7 @@ export const RecordsPage = () => {
         ))
       ) : (
         <section className="panel-soft p-8 text-slate-300">
-          Detailní rekordbook je teď rozepsaný pro tým A podle dodaného výřezu ze stats.txt. Layout je připravený i pro B, C a A+B+C,
-          ale jejich tabulky zatím nejsou zapsané.
+          Pro vybraný scope zatím backend nevrátil žádné hráčské rekordy.
         </section>
       )}
     </div>

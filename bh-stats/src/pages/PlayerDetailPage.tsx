@@ -3,31 +3,19 @@ import { Link, useParams } from 'react-router';
 import { ArrowLeft, CalendarRange, Shield } from 'lucide-react';
 import { StatCard } from '@components/StatCard';
 import { Table } from '@components/Table';
-import { getMatches, getPlayerById, getSeasons } from '@utils/api';
+import { getPlayerDetailStats, type PlayerDetailResponse } from '@utils/api';
 import { formatDate, formatMinutes, getScoreLabel } from '@utils/helpers';
-import { getPlayerMatchLog, getPlayerSeasonRows, getPlayerStats, positionLabel, resultLabel } from '@utils/statistics';
-import type { Match } from '@models/match';
-import type { Player } from '@models/player';
-import type { Season } from '@models/season';
+import { positionLabel, resultLabel } from '@utils/statistics';
 
 export const PlayerDetailPage = () => {
   const { playerId = '' } = useParams();
-  const [player, setPlayer] = useState<Player | null>(null);
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [playerDetail, setPlayerDetail] = useState<PlayerDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
-      const [nextPlayer, nextMatches, nextSeasons] = await Promise.all([
-        getPlayerById(playerId),
-        getMatches(),
-        getSeasons(),
-      ]);
-
-      setPlayer(nextPlayer ?? null);
-      setMatches(nextMatches);
-      setSeasons(nextSeasons);
+      const nextPlayerDetail = await getPlayerDetailStats(playerId);
+      setPlayerDetail(nextPlayerDetail ?? null);
       setLoading(false);
     };
 
@@ -38,7 +26,7 @@ export const PlayerDetailPage = () => {
     return <div className="panel-soft p-8 text-slate-300">Načítám detail hráče…</div>;
   }
 
-  if (!player) {
+  if (!playerDetail) {
     return (
       <div className="panel-soft space-y-4 p-8">
         <h1 className="text-2xl font-semibold text-white">Hráč nebyl nalezen</h1>
@@ -50,9 +38,7 @@ export const PlayerDetailPage = () => {
     );
   }
 
-  const overallStats = getPlayerStats([player], matches)[0];
-  const matchLog = getPlayerMatchLog(player.id, matches);
-  const seasonRows = getPlayerSeasonRows(player.id, seasons, matches);
+  const { player, overallStats, matchLog, seasonRows } = playerDetail;
 
   return (
     <div className="space-y-6">

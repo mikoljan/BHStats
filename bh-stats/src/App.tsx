@@ -1,6 +1,7 @@
 import './App.css';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { Header } from '@components/UI/Header';
+import { MatchImportPage } from '@pages/MatchImportPage';
 import { MainPage } from '@pages/MainPage';
 import { MatchDetailPage } from '@pages/MatchDetailPage';
 import { MatchesPage } from '@pages/MatchesPage';
@@ -8,6 +9,7 @@ import { OverviewPage } from '@pages/OverviewPage';
 import { PlayerDetailPage } from '@pages/PlayerDetailPage';
 import { PlayersPage } from '@pages/PlayersPage';
 import { RecordsPage } from '@pages/RecordsPage';
+import { SeasonCreatePage } from '@pages/SeasonCreatePage';
 import { SeriesPage } from '@pages/SeriesPage';
 import { TeamRecordsPage } from '@pages/TeamRecordsPage';
 
@@ -23,6 +25,8 @@ function App() {
             <Route path="/players" element={<PlayersPage />} />
             <Route path="/players/:playerId" element={<PlayerDetailPage />} />
             <Route path="/matches" element={<MatchesPage />} />
+            <Route path="/matches/import" element={<MatchImportPage />} />
+            <Route path="/seasons/create" element={<SeasonCreatePage />} />
             <Route path="/matches/:matchId" element={<MatchDetailPage />} />
             <Route path="/records" element={<Navigate to="/records/player" replace />} />
             <Route path="/records/player" element={<RecordsPage />} />

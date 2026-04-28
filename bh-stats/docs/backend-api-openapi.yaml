@@ -1,0 +1,1386 @@
+openapi: 3.1.0
+info:
+  title: Blue Horses Stats API
+  version: 1.0.0
+  summary: Backend kontrakt pro celou frontend aplikaci Blue Horses Stats.
+  description: |
+    Tato specifikace popisuje API pro celou aplikaci Blue Horses Stats.
+
+    Dokument je rozdeleny na dve vrstvy:
+    - primarni entity, ze kterych lze frontend slozit a statistiky dopoctitat
+    - frontend-first read endpointy pro hotove pohledy jako prehled, rekordy a serie
+
+    Pokud backend implementuje jen primarni entity, frontend pujde postavit stejne jako aktualni repo.
+    Pokud implementuje i frontend-first endpointy, pujde dalsi frontend generovat jednoduseji a s mensi logikou na klientu.
+
+    Zakladni entity:
+    - seznam hracu
+    - detail hrace
+    - seznam sezon
+    - seznam zapasu
+    - detail zapasu
+    - ulozeni detailu zapasu
+    - seznam stadionu
+    - seznam tymu
+
+    Frontend-first read endpointy v teto specifikaci:
+    - prehled celkovych statistik
+    - statistik y hracu a brankaru
+    - detail hrace vcetne season rows a match logu
+    - hracske rekordy
+    - tymove rekordy
+    - serie hracu podle scope
+servers:
+  - url: http://localhost:5000
+    description: Example production server
+  - url: http://localhost:3000
+    description: Local development server
+tags:
+  - name: Players
+  - name: Matches
+  - name: Seasons
+  - name: Stadiums
+  - name: Teams
+  - name: Overview
+  - name: Statistics
+  - name: Player Details
+  - name: Player Records
+  - name: Team Records
+  - name: Series
+paths:
+  /players:
+    get:
+      tags: [Players]
+      summary: List players
+      description: |
+        Vraci vsechny hrace potrebne pro soupisku, detail hrace, detail zapasu a vypocet statistik.
+
+        Frontend si dnes filtruje scope A/B/C i statistiky lokalne, takze endpoint nemusi byt agregovany.
+        Query parametry jsou doporucene jako volitelne optimalizace pro backend.
+      parameters:
+        - in: query
+          name: squad
+          required: false
+          schema:
+            $ref: '#/components/schemas/SquadId'
+          description: Volitelne filtrovani podle tymu A/B/C.
+        - in: query
+          name: position
+          required: false
+          schema:
+            $ref: '#/components/schemas/PlayerPosition'
+          description: Volitelne filtrovani podle pozice.
+      responses:
+        '200':
+          description: Array of players
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Player'
+              examples:
+                default:
+                  value:
+                    - id: player-stanislav-prokop
+                      name: Stanislav Prokop
+                      number: '10'
+                      position: forward
+                      squads: [A]
+                    - id: player-lukas-zbranek
+                      name: Lukáš Zbránek
+                      number: '1'
+                      position: goalie
+                      squads: [A]
+  /players/{playerId}:
+    get:
+      tags: [Players]
+      summary: Get player detail
+      parameters:
+        - $ref: '#/components/parameters/PlayerId'
+      responses:
+        '200':
+          description: Player detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Player'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /seasons:
+    get:
+      tags: [Seasons]
+      summary: List seasons
+      description: |
+        Vraci vsechny sezony pouzivane v OverviewPage, MainPage, PlayersPage, PlayerDetailPage a MatchDetailPage.
+      responses:
+        '200':
+          description: Array of seasons
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Season'
+  /stadiums:
+    get:
+      tags: [Stadiums]
+      summary: List stadiums
+      description: Vraci ciselnik stadionu pro seznam zapasu a editaci detailu zapasu.
+      responses:
+        '200':
+          description: Array of stadiums
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Stadium'
+  /teams:
+    get:
+      tags: [Teams]
+      summary: List teams
+      description: |
+        Ciselnik tymu pro kompletni API vrstvu aplikace.
+      responses:
+        '200':
+          description: Array of teams
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Team'
+  /overview:
+    get:
+      tags: [Overview]
+      summary: Get aggregated overview for dashboard pages
+      description: |
+        Frontend-first endpoint pro MainPage a OverviewPage.
+        Pokud nebude implementovan, lze stejna data spocitat na frontendu z /matches, /players a /seasons.
+      parameters:
+        - in: query
+          name: scope
+          required: false
+          schema:
+            $ref: '#/components/schemas/TeamScope'
+        - in: query
+          name: seasonId
+          required: false
+          schema:
+            type: string
+          description: Optional season filter. Hodnota ALL znamena agregaci pres vsechny sezony.
+      responses:
+        '200':
+          description: Overview payload for chronicle and summary pages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OverviewResponse'
+  /statistics/players:
+    get:
+      tags: [Statistics]
+      summary: List computed player statistics
+      description: |
+        Frontend-first endpoint pro PlayersPage v rezimu Hráči.
+        Pokud nebude implementovan, lze stejna data spocitat z /players a /matches.
+      parameters:
+        - in: query
+          name: scope
+          required: false
+          schema:
+            $ref: '#/components/schemas/TeamScope'
+        - in: query
+          name: seasonId
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: leagueName
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of computed player stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlayerStatLine'
+  /statistics/goalies:
+    get:
+      tags: [Statistics]
+      summary: List computed goalie statistics
+      description: |
+        Frontend-first endpoint pro PlayersPage v rezimu Gólmani.
+        Pokud nebude implementovan, lze stejna data spocitat z /players a /matches.
+      parameters:
+        - in: query
+          name: scope
+          required: false
+          schema:
+            $ref: '#/components/schemas/TeamScope'
+        - in: query
+          name: seasonId
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: leagueName
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of computed goalie stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GoalieStatLine'
+  /players/{playerId}/stats:
+    get:
+      tags: [Player Details]
+      summary: Get player detail payload with derived statistics
+      description: |
+        Frontend-first endpoint pro PlayerDetailPage.
+        Vraci zakladni detail hrace i vsechny odvozene bloky pro vykresleni detailu bez dalsich klientskych vypoctu.
+      parameters:
+        - $ref: '#/components/parameters/PlayerId'
+      responses:
+        '200':
+          description: Aggregated player detail payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /records/players:
+    get:
+      tags: [Player Records]
+      summary: Get player recordbook
+      description: |
+        Vraci data pro stranku hráčských rekordů.
+        Scope lze zachovat pro A/B/C/ALL, i kdyz aktualni data jsou rozepsana hlavne pro A tým.
+      parameters:
+        - in: query
+          name: scope
+          required: false
+          schema:
+            $ref: '#/components/schemas/TeamScope'
+      responses:
+        '200':
+          description: Player recordbook payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerRecordBookResponse'
+  /records/teams:
+    get:
+      tags: [Team Records]
+      summary: Get team recordbook
+      description: Vraci data pro stránku týmových rekordů.
+      parameters:
+        - in: query
+          name: scope
+          required: false
+          schema:
+            $ref: '#/components/schemas/TeamScope'
+      responses:
+        '200':
+          description: Team recordbook payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamRecordBookResponse'
+  /series:
+    get:
+      tags: [Series]
+      summary: Get series matrix for selected team scope
+      description: |
+        Vraci matici pro stránku Série.
+        Pokud backend nechce drzet hotovou matici, muze ji skladat ze stats zdroje nebo vlastni databaze.
+      parameters:
+        - in: query
+          name: scope
+          required: true
+          schema:
+            $ref: '#/components/schemas/SeriesScope'
+        - in: query
+          name: query
+          required: false
+          schema:
+            type: string
+          description: Optional server-side search over playerName.
+      responses:
+        '200':
+          description: Series matrix payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeriesMatrix'
+  /matches:
+    get:
+      tags: [Matches]
+      summary: List matches
+      description: |
+        Vraci vsechny zapasy vcetne nested dat goals, penalties a goalieMinutes.
+        Z techto dat frontend pocita:
+        - statistiky hracu
+        - statistiky brankaru
+        - prehled sezon
+        - tymove souhrny
+        - detail hrace a match log
+
+        Doporuceni:
+        - endpoint muze vracet kompletni seznam, pokud je dat malo
+        - pro vetsi objem dat lze pridat query filtry, ale nejsou povinne pro prvni verzi
+      parameters:
+        - in: query
+          name: squad
+          required: false
+          schema:
+            $ref: '#/components/schemas/SquadId'
+          description: Volitelne filtrovani podle tymu.
+        - in: query
+          name: seasonId
+          required: false
+          schema:
+            type: string
+          description: Volitelne filtrovani podle sezony.
+        - in: query
+          name: playerId
+          required: false
+          schema:
+            type: string
+          description: Volitelne filtrovani zapasu, ve kterych byl hrac v presentPlayerIds.
+        - in: query
+          name: include
+          required: false
+          schema:
+            type: string
+            example: goals,penalties,goalieMinutes
+          description: Optional include hint, pokud backend chce umet lehci a tezsi varianty payloadu.
+      responses:
+        '200':
+          description: Array of matches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Match'
+  /matches/{matchId}:
+    get:
+      tags: [Matches]
+      summary: Get match detail
+      parameters:
+        - $ref: '#/components/parameters/MatchId'
+      responses:
+        '200':
+          description: Match detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Match'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Matches]
+      summary: Replace editable match detail
+      description: |
+        Frontend dnes pri ulozeni posila cely objekt Match.
+        Backend muze zachovat tento kontrakt a zjednodusit tak integraci.
+
+        Dulezite backend pravidlo:
+        - result doporucujeme prepocitat server-side z ourScore a opponentScore, i kdyz klient pole posila
+        - nested goal a penalty IDs mohou byt prijaty tak, jak je klient posle
+      parameters:
+        - $ref: '#/components/parameters/MatchId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchUpsertRequest'
+            examples:
+              default:
+                value:
+                  id: match-2024-10-13-bohemians-b
+                  squad: A
+                  stadiumId: stadium-1
+                  date: '2024-10-13'
+                  opponent: FbŠ Bohemians B
+                  seasonId: season-2024-2025-a
+                  homeGame: true
+                  matchLength: 60
+                  ourScore: 3
+                  opponentScore: 30
+                  result: L
+                  presentPlayerIds:
+                    - player-lukas-zbranek
+                    - player-zdenek-husak
+                  goalieMinutes:
+                    - playerId: player-lukas-zbranek
+                      minutesPlayed: 60
+                  goals:
+                    - id: goal-1
+                      type: even strength
+                      time: 125
+                      scorerId: player-zdenek-husak
+                      assistId: player-jiri-polivka
+                      matchId: match-2024-10-13-bohemians-b
+                      ourTeam: true
+                      winningGoal: false
+                      equalizingGoal: false
+                  penalties:
+                    - id: penalty-1
+                      type: minor
+                      time: 340
+                      penaltyMinutes: 2
+                      playerId: player-jiri-polivka
+                      matchId: match-2024-10-13-bohemians-b
+                      ourTeam: true
+      responses:
+        '200':
+          description: Saved match
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Match'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Matches]
+      summary: Partially update match detail
+      description: |
+        Volitelna alternativa k PUT, pokud backend preferuje partial updates.
+        Frontend dnes PATCH nepotrebuje, ale je vhodny jako pohodlnejsi varianta pro dalsi integraci.
+      parameters:
+        - $ref: '#/components/parameters/MatchId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchPatchRequest'
+      responses:
+        '200':
+          description: Updated match
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Match'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  parameters:
+    PlayerId:
+      in: path
+      name: playerId
+      required: true
+      schema:
+        type: string
+      description: Unique player identifier.
+    MatchId:
+      in: path
+      name: matchId
+      required: true
+      schema:
+        type: string
+      description: Unique match identifier.
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: NOT_FOUND
+            message: Resource not found.
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: VALIDATION_ERROR
+            message: Request payload is invalid.
+            details:
+              field: seasonId
+  schemas:
+    TeamScope:
+      type: string
+      enum: [A, B, C, ALL]
+    SquadId:
+      type: string
+      enum: [A, B, C]
+    SeriesScope:
+      type: string
+      enum: [A, B, C]
+    MatchResult:
+      type: string
+      enum: [W, L, D]
+    PlayerPosition:
+      type: string
+      enum: [goalie, defender, forward, utility]
+    GoalType:
+      type: string
+      description: |
+        Frontend dnes pracuje s hodnotami even strength, power play, shorthanded, penalty shot, empty net.
+        Pokud backend pouzije enum, doporucena sada je niz.
+      enum:
+        - even strength
+        - power play
+        - shorthanded
+        - penalty shot
+        - empty net
+    PenaltyType:
+      type: string
+      description: |
+        Frontend pouziva string bez pevne validace. Doporuceny enum muze byt rozsireny podle potreby souteze.
+      enum:
+        - minor
+        - major
+        - misconduct
+        - bench
+    Player:
+      type: object
+      required: [id, name, number, position, squads]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        number:
+          type: string
+          description: Cislo hrace jako string, aby slo zachovat vedouci nuly nebo specialni formaty.
+        position:
+          $ref: '#/components/schemas/PlayerPosition'
+        squads:
+          type: array
+          items:
+            $ref: '#/components/schemas/SquadId'
+    Season:
+      type: object
+      required: [id, year, team, leagueLevel, leagueName, position, covidInterrupted]
+      properties:
+        id:
+          type: string
+        year:
+          type: string
+          example: 2024/2025
+        team:
+          type: string
+          example: A
+        leagueLevel:
+          type: integer
+          minimum: 1
+        leagueName:
+          type: string
+        position:
+          type:
+            - integer
+            - 'null'
+        covidInterrupted:
+          type: boolean
+    Stadium:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    Team:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    GoalMilestone:
+      type: object
+      required: [milestone, date, opponent, scorerName]
+      properties:
+        milestone:
+          type: integer
+        date:
+          type: string
+          format: date
+        opponent:
+          type: string
+        scorerName:
+          type: string
+    TeamRecordSummary:
+      type: object
+      required: [matches, wins, draws, losses, goalsFor, goalsAgainst, points]
+      properties:
+        matches:
+          type: integer
+        wins:
+          type: integer
+        draws:
+          type: integer
+        losses:
+          type: integer
+        goalsFor:
+          type: integer
+        goalsAgainst:
+          type: integer
+        points:
+          type: integer
+    SeasonHistoryRow:
+      type: object
+      required: [season, matches, wins, draws, losses, goalsFor, goalsAgainst, points]
+      properties:
+        season:
+          $ref: '#/components/schemas/Season'
+        matches:
+          type: integer
+        wins:
+          type: integer
+        draws:
+          type: integer
+        losses:
+          type: integer
+        goalsFor:
+          type: integer
+        goalsAgainst:
+          type: integer
+        points:
+          type: integer
+    PlayerSummary:
+      type: object
+      required: [id, name, number, position]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        number:
+          type: string
+        position:
+          $ref: '#/components/schemas/PlayerPosition'
+    PlayerStatLine:
+      type: object
+      required:
+        - player
+        - matches
+        - goals
+        - assists
+        - points
+        - penaltyMinutes
+        - goalieMinutes
+        - pointsPerGame
+        - powerPlayGoals
+        - shorthandedGoals
+        - gameWinningGoals
+        - gameTyingGoals
+        - penaltyShotGoals
+        - emptyNetGoals
+      properties:
+        player:
+          $ref: '#/components/schemas/PlayerSummary'
+        matches:
+          type: integer
+        goals:
+          type: integer
+        assists:
+          type: integer
+        points:
+          type: integer
+        penaltyMinutes:
+          type: integer
+        goalieMinutes:
+          type: number
+        pointsPerGame:
+          type: number
+        powerPlayGoals:
+          type: integer
+        shorthandedGoals:
+          type: integer
+        gameWinningGoals:
+          type: integer
+        gameTyingGoals:
+          type: integer
+        penaltyShotGoals:
+          type: integer
+        emptyNetGoals:
+          type: integer
+    GoalieStatLine:
+      type: object
+      required:
+        - player
+        - matches
+        - wins
+        - cleanSheets
+        - minutes
+        - goalsAgainst
+        - goalsAgainstPerGame
+        - assists
+        - shootouts
+        - shootoutGoalsAgainst
+        - shootoutSavePercentage
+      properties:
+        player:
+          $ref: '#/components/schemas/PlayerSummary'
+        matches:
+          type: integer
+        wins:
+          type: integer
+        cleanSheets:
+          type: integer
+        minutes:
+          type: number
+        goalsAgainst:
+          type: number
+        goalsAgainstPerGame:
+          type: number
+        assists:
+          type: integer
+        shootouts:
+          type: integer
+        shootoutGoalsAgainst:
+          type: integer
+        shootoutSavePercentage:
+          type:
+            - number
+            - 'null'
+    PlayerMatchLogRow:
+      type: object
+      required: [match, goals, assists, points, penaltyMinutes, scored]
+      properties:
+        match:
+          $ref: '#/components/schemas/Match'
+        goals:
+          type: integer
+        assists:
+          type: integer
+        points:
+          type: integer
+        penaltyMinutes:
+          type: integer
+        scored:
+          type: boolean
+    PlayerSeasonRow:
+      type: object
+      required: [season, matches, goals, assists, points, penaltyMinutes]
+      properties:
+        season:
+          $ref: '#/components/schemas/Season'
+        matches:
+          type: integer
+        goals:
+          type: integer
+        assists:
+          type: integer
+        points:
+          type: integer
+        penaltyMinutes:
+          type: integer
+    OverviewAggregate:
+      type: object
+      required:
+        - matches
+        - wins
+        - overtimeWins
+        - draws
+        - overtimeLosses
+        - losses
+        - points
+        - goalsFor
+        - goalsAgainst
+        - goalDiff
+        - powerPlayOpportunities
+        - powerPlayGoals
+        - powerPlayEfficiency
+        - powerPlayGoalsAgainst
+        - penaltyKillOpportunities
+        - penaltyKillGoalsAgainst
+        - penaltyKillEfficiency
+        - shorthandedGoals
+      properties:
+        matches:
+          type: integer
+        wins:
+          type: integer
+        overtimeWins:
+          type: integer
+        draws:
+          type: integer
+        overtimeLosses:
+          type: integer
+        losses:
+          type: integer
+        points:
+          type: integer
+        goalsFor:
+          type: integer
+        goalsAgainst:
+          type: integer
+        goalDiff:
+          type: integer
+        powerPlayOpportunities:
+          type: integer
+        powerPlayGoals:
+          type: integer
+        powerPlayEfficiency:
+          type: number
+        powerPlayGoalsAgainst:
+          type: integer
+        penaltyKillOpportunities:
+          type: integer
+        penaltyKillGoalsAgainst:
+          type: integer
+        penaltyKillEfficiency:
+          type: number
+        shorthandedGoals:
+          type: integer
+    OverviewResponse:
+      type: object
+      required: [scope, seasonId, summary, seasonHistory, milestones]
+      properties:
+        scope:
+          $ref: '#/components/schemas/TeamScope'
+        seasonId:
+          type: string
+        summary:
+          $ref: '#/components/schemas/OverviewAggregate'
+        teamRecordSummary:
+          $ref: '#/components/schemas/TeamRecordSummary'
+        seasonHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeasonHistoryRow'
+        milestones:
+          type: array
+          items:
+            $ref: '#/components/schemas/GoalMilestone'
+        topPlayers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerStatLine'
+    PlayerDetailResponse:
+      type: object
+      required: [player, overallStats, seasonRows, matchLog]
+      properties:
+        player:
+          $ref: '#/components/schemas/Player'
+        overallStats:
+          $ref: '#/components/schemas/PlayerStatLine'
+        seasonRows:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerSeasonRow'
+        matchLog:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerMatchLogRow'
+    RecordBookIconName:
+      type: string
+      enum: [zap, sparkles, medal, star, clock]
+    RecordBookHeroStat:
+      type: object
+      required: [label, value, note]
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+        note:
+          type: string
+    RecordBookRow:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        playerName:
+          type: string
+        goals:
+          oneOf:
+            - type: integer
+            - type: string
+        assists:
+          oneOf:
+            - type: integer
+            - type: string
+        points:
+          oneOf:
+            - type: integer
+            - type: string
+        count:
+          oneOf:
+            - type: integer
+            - type: string
+        matches:
+          oneOf:
+            - type: integer
+            - type: string
+        season:
+          type: string
+        opponent:
+          type: string
+        time:
+          type: string
+        date:
+          type: string
+        period:
+          type: string
+    RecordBookColumn:
+      type: object
+      required: [key, header]
+      properties:
+        key:
+          type: string
+        header:
+          type: string
+        className:
+          type: string
+    RecordBookTable:
+      type: object
+      required: [key, eyebrow, title, caption, accentClassName, iconName, columns, rows]
+      properties:
+        key:
+          type: string
+        eyebrow:
+          type: string
+        title:
+          type: string
+        caption:
+          type: string
+        accentClassName:
+          type: string
+        iconName:
+          $ref: '#/components/schemas/RecordBookIconName'
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecordBookColumn'
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecordBookRow'
+    RecordBookSection:
+      type: object
+      required: [key, eyebrow, title, description, gridClassName, tables]
+      properties:
+        key:
+          type: string
+        eyebrow:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        gridClassName:
+          type: string
+        tables:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecordBookTable'
+    PlayerRecordBookResponse:
+      type: object
+      required: [scope, heroStats, sections]
+      properties:
+        scope:
+          $ref: '#/components/schemas/TeamScope'
+        heroStats:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecordBookHeroStat'
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecordBookSection'
+    TeamRecordRow:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        score:
+          type: string
+        opponent:
+          type: string
+        date:
+          type: string
+        count:
+          oneOf:
+            - type: integer
+            - type: string
+        period:
+          type: string
+        time:
+          type: string
+    TeamRecordColumn:
+      type: object
+      required: [key, header]
+      properties:
+        key:
+          type: string
+        header:
+          type: string
+        className:
+          type: string
+    TeamRecordTable:
+      type: object
+      required: [key, eyebrow, title, caption, accentClassName, iconName, columns, rows]
+      properties:
+        key:
+          type: string
+        eyebrow:
+          type: string
+        title:
+          type: string
+        caption:
+          type: string
+        accentClassName:
+          type: string
+        iconName:
+          $ref: '#/components/schemas/RecordBookIconName'
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamRecordColumn'
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamRecordRow'
+    TeamRecordSection:
+      type: object
+      required: [key, eyebrow, title, description, gridClassName, tables]
+      properties:
+        key:
+          type: string
+        eyebrow:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        gridClassName:
+          type: string
+        tables:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamRecordTable'
+    TeamRecordBookResponse:
+      type: object
+      required: [scope, heroStats, sections]
+      properties:
+        scope:
+          $ref: '#/components/schemas/TeamScope'
+        heroStats:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecordBookHeroStat'
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamRecordSection'
+    SeriesCellState:
+      type: string
+      enum: [absent, played, point, goal]
+    SeriesSeasonGroup:
+      type: object
+      required: [label, startIndex, span]
+      properties:
+        label:
+          type: string
+        startIndex:
+          type: integer
+        span:
+          type: integer
+    SeriesColumn:
+      type: object
+      required: [index, season, date]
+      properties:
+        index:
+          type: integer
+        season:
+          type: string
+        date:
+          type: string
+    SeriesPlayerRow:
+      type: object
+      required: [id, playerName, cells, goals, absences]
+      properties:
+        id:
+          type: string
+        playerName:
+          type: string
+        cells:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeriesCellState'
+        goals:
+          type: integer
+        absences:
+          type: integer
+    SeriesMatrix:
+      type: object
+      required:
+        - scope
+        - seasons
+        - columns
+        - rows
+        - totalMatches
+        - goalMarks
+        - pointMarks
+        - absentMarks
+        - hasExplicitPointMarks
+      properties:
+        scope:
+          $ref: '#/components/schemas/SeriesScope'
+        seasons:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeriesSeasonGroup'
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeriesColumn'
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeriesPlayerRow'
+        totalMatches:
+          type: integer
+        goalMarks:
+          type: integer
+        pointMarks:
+          type: integer
+        absentMarks:
+          type: integer
+        hasExplicitPointMarks:
+          type: boolean
+    GoalieMinutes:
+      type: object
+      required: [playerId, minutesPlayed]
+      properties:
+        playerId:
+          type: string
+        minutesPlayed:
+          type: number
+          minimum: 0
+    Goal:
+      type: object
+      required:
+        - id
+        - type
+        - time
+        - scorerId
+        - assistId
+        - matchId
+        - ourTeam
+        - winningGoal
+        - equalizingGoal
+      properties:
+        id:
+          type: string
+        type:
+          oneOf:
+            - $ref: '#/components/schemas/GoalType'
+            - type: string
+          description: Umoznuje i dalsi vlastni typy, pokud backend nechce byt striktny.
+        time:
+          type: integer
+          minimum: 0
+          description: Cas golu v sekundach od zacatku zapasu.
+        scorerId:
+          type:
+            - string
+            - 'null'
+        assistId:
+          type:
+            - string
+            - 'null'
+        matchId:
+          type: string
+        ourTeam:
+          type: boolean
+        winningGoal:
+          type: boolean
+        equalizingGoal:
+          type: boolean
+    Penalty:
+      type: object
+      required:
+        - id
+        - type
+        - time
+        - penaltyMinutes
+        - playerId
+        - matchId
+        - ourTeam
+      properties:
+        id:
+          type: string
+        type:
+          oneOf:
+            - $ref: '#/components/schemas/PenaltyType'
+            - type: string
+        time:
+          type: integer
+          minimum: 0
+          description: Cas trestu v sekundach od zacatku zapasu.
+        penaltyMinutes:
+          type: integer
+          minimum: 0
+        playerId:
+          type:
+            - string
+            - 'null'
+        matchId:
+          type: string
+        ourTeam:
+          type: boolean
+    Match:
+      type: object
+      required:
+        - id
+        - squad
+        - stadiumId
+        - date
+        - opponent
+        - seasonId
+        - homeGame
+        - matchLength
+        - ourScore
+        - opponentScore
+        - result
+        - presentPlayerIds
+        - goalieMinutes
+        - goals
+        - penalties
+      properties:
+        id:
+          type: string
+        squad:
+          $ref: '#/components/schemas/SquadId'
+        stadiumId:
+          type:
+            - string
+            - 'null'
+        date:
+          type: string
+          format: date
+        opponent:
+          type: string
+        seasonId:
+          type: string
+        homeGame:
+          type: boolean
+        matchLength:
+          type: integer
+          minimum: 1
+          description: Delka zapasu v minutach.
+        ourScore:
+          type: integer
+          minimum: 0
+        opponentScore:
+          type: integer
+          minimum: 0
+        result:
+          $ref: '#/components/schemas/MatchResult'
+        presentPlayerIds:
+          type: array
+          items:
+            type: string
+        goalieMinutes:
+          type: array
+          items:
+            $ref: '#/components/schemas/GoalieMinutes'
+        goals:
+          type: array
+          items:
+            $ref: '#/components/schemas/Goal'
+        penalties:
+          type: array
+          items:
+            $ref: '#/components/schemas/Penalty'
+    MatchUpsertRequest:
+      allOf:
+        - $ref: '#/components/schemas/Match'
+      description: |
+        Frontend dnes pri ulozeni posila cely objekt Match.
+        Backend muze prijmout stejny shape a result si pripadne prepocitat interne.
+    MatchPatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        squad:
+          $ref: '#/components/schemas/SquadId'
+        stadiumId:
+          type:
+            - string
+            - 'null'
+        date:
+          type: string
+          format: date
+        opponent:
+          type: string
+        seasonId:
+          type: string
+        homeGame:
+          type: boolean
+        matchLength:
+          type: integer
+          minimum: 1
+        ourScore:
+          type: integer
+          minimum: 0
+        opponentScore:
+          type: integer
+          minimum: 0
+        result:
+          $ref: '#/components/schemas/MatchResult'
+        presentPlayerIds:
+          type: array
+          items:
+            type: string
+        goalieMinutes:
+          type: array
+          items:
+            $ref: '#/components/schemas/GoalieMinutes'
+        goals:
+          type: array
+          items:
+            $ref: '#/components/schemas/Goal'
+        penalties:
+          type: array
+          items:
+            $ref: '#/components/schemas/Penalty'
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          description: Optional validation or debugging payload.

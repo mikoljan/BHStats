@@ -6,6 +6,7 @@ const seasonSchema = new mongoose.Schema({
     leagueLevel: { type: Number, required: true, default: 0 },
     leagueName: { type: String },
     position: { type: Number },
+    movement: { type: String, enum: ['promotion', 'relegation', null], default: null },
     covidInterrupted: { type: Boolean, default: false },
 }, { timestamps: true });
 

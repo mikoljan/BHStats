@@ -1,127 +1,81 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ScopeTabs, type TeamScope } from '@components/UI/ScopeTabs';
-import { getMatches, getSeasons } from '@utils/api';
-import { filterMatchesByScope, scopeLabel } from '@utils/statistics';
-import type { Match } from '@models/match';
+import { getOverview, getSeasons, type OverviewResponse } from '@utils/api';
+import { scopeLabel } from '@utils/statistics';
 import type { Season } from '@models/season';
 
-interface OverallSeasonStats {
-	matches: number;
-	wins: number;
-	overtimeWins: number;
-	draws: number;
-	overtimeLosses: number;
-	losses: number;
-	points: number;
-	goalsFor: number;
-	goalsAgainst: number;
-	goalDiff: number;
-	powerPlayOpportunities: number;
-	powerPlayGoals: number;
-	powerPlayEfficiency: number;
-	powerPlayGoalsAgainst: number;
-	penaltyKillOpportunities: number;
-	penaltyKillGoalsAgainst: number;
-	penaltyKillEfficiency: number;
-	shorthandedGoals: number;
-}
-
 const formatPercent = (value: number) => value.toFixed(2).replace('.', ',');
+
+const movementLabel = {
+	promotion: 'Postup',
+	relegation: 'Sestup',
+} as const;
 
 const getSeasonDescriptor = (season: Season | undefined) => {
 	if (!season) {
 		return 'Celkové statistiky';
 	}
 
+	const movementSuffix = season.movement ? ` • ${movementLabel[season.movement]}` : '';
+
 	if (season.covidInterrupted) {
-		return season.position ? `${season.position}. místo - nedohráno (COVID)` : 'Nedohráno (COVID)';
+		return season.position ? `${season.position}. místo - nedohráno (COVID)${movementSuffix}` : `Nedohráno (COVID)${movementSuffix}`;
 	}
 
-	return season.position ? `${season.position}. místo` : season.leagueName;
+	return season.position ? `${season.position}. místo${movementSuffix}` : `${season.leagueName}${movementSuffix}`;
 };
-
-const buildOverallSeasonStats = (matches: Match[]): OverallSeasonStats => {
-	const wins = matches.filter((match) => match.result === 'W').length;
-	const draws = matches.filter((match) => match.result === 'D').length;
-	const losses = matches.filter((match) => match.result === 'L').length;
-	const goalsFor = matches.reduce((total, match) => total + match.ourScore, 0);
-	const goalsAgainst = matches.reduce((total, match) => total + match.opponentScore, 0);
-	const powerPlayOpportunities = matches.reduce(
-		(total, match) => total + match.penalties.filter((penalty) => !penalty.ourTeam).length,
-		0,
-	);
-	const powerPlayGoals = matches.reduce(
-		(total, match) => total + match.goals.filter((goal) => goal.ourTeam && goal.type === 'power play').length,
-		0,
-	);
-	const powerPlayGoalsAgainst = matches.reduce(
-		(total, match) => total + match.goals.filter((goal) => !goal.ourTeam && goal.type === 'shorthanded').length,
-		0,
-	);
-	const penaltyKillOpportunities = matches.reduce(
-		(total, match) => total + match.penalties.filter((penalty) => penalty.ourTeam).length,
-		0,
-	);
-	const penaltyKillGoalsAgainst = matches.reduce(
-		(total, match) => total + match.goals.filter((goal) => !goal.ourTeam && goal.type === 'power play').length,
-		0,
-	);
-	const shorthandedGoals = matches.reduce(
-		(total, match) => total + match.goals.filter((goal) => goal.ourTeam && goal.type === 'shorthanded').length,
-		0,
-	);
-
-	return {
-		matches: matches.length,
-		wins,
-		overtimeWins: 0,
-		draws,
-		overtimeLosses: 0,
-		losses,
-		points: wins * 3 + draws,
-		goalsFor,
-		goalsAgainst,
-		goalDiff: goalsFor - goalsAgainst,
-		powerPlayOpportunities,
-		powerPlayGoals,
-		powerPlayEfficiency: powerPlayOpportunities > 0 ? (powerPlayGoals / powerPlayOpportunities) * 100 : 0,
-		powerPlayGoalsAgainst,
-		penaltyKillOpportunities,
-		penaltyKillGoalsAgainst,
-		penaltyKillEfficiency:
-			penaltyKillOpportunities > 0 ? ((penaltyKillOpportunities - penaltyKillGoalsAgainst) / penaltyKillOpportunities) * 100 : 0,
-		shorthandedGoals,
-	};
-};
-
 export const OverviewPage = () => {
-	const [matches, setMatches] = useState<Match[]>([]);
 	const [seasons, setSeasons] = useState<Season[]>([]);
+	const [overviewData, setOverviewData] = useState<OverviewResponse | null>(null);
 	const [scope, setScope] = useState<TeamScope>('ALL');
 	const [seasonId, setSeasonId] = useState('ALL');
 	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
-		const load = async () => {
-			const [nextMatches, nextSeasons] = await Promise.all([getMatches(), getSeasons()]);
-			setMatches(nextMatches);
+		const loadSeasons = async () => {
+			const nextSeasons = await getSeasons();
 			setSeasons(nextSeasons);
+		};
+
+		void loadSeasons();
+	}, []);
+
+	useEffect(() => {
+		const loadOverview = async () => {
+			setLoading(true);
+			const nextOverview = await getOverview(scope, seasonId);
+			setOverviewData(nextOverview);
 			setLoading(false);
 		};
 
-		void load();
-	}, []);
+		void loadOverview();
+	}, [scope, seasonId]);
 
 	const seasonOptions = useMemo(
 		() => [...seasons].sort((left, right) => right.year.localeCompare(left.year, 'cs')),
 		[seasons],
 	);
 	const selectedSeason = seasonOptions.find((season) => season.id === seasonId);
-	const filteredMatches = useMemo(() => {
-		const scopedMatches = filterMatchesByScope(matches, scope);
-		return seasonId === 'ALL' ? scopedMatches : scopedMatches.filter((match) => match.seasonId === seasonId);
-	}, [matches, scope, seasonId]);
-	const overview = useMemo(() => buildOverallSeasonStats(filteredMatches), [filteredMatches]);
+	const overview = overviewData?.summary ?? {
+		matches: 0,
+		wins: 0,
+		overtimeWins: 0,
+		draws: 0,
+		overtimeLosses: 0,
+		losses: 0,
+		points: 0,
+		goalsFor: 0,
+		goalsAgainst: 0,
+		goalDiff: 0,
+		powerPlayOpportunities: 0,
+		powerPlayGoals: 0,
+		powerPlayEfficiency: 0,
+		powerPlayGoalsAgainst: 0,
+		penaltyKillOpportunities: 0,
+		penaltyKillGoalsAgainst: 0,
+		penaltyKillEfficiency: 0,
+		shorthandedGoals: 0,
+	};
 
 	if (loading) {
 		return <div className="panel-soft p-8 text-slate-300">Načítám celkový přehled…</div>;
@@ -187,32 +141,30 @@ export const OverviewPage = () => {
 							<table className="min-w-full text-left text-sm text-slate-200">
 								<thead className="text-xs uppercase tracking-[0.18em] text-slate-400">
 									<tr>
-										<th className="pb-3 pr-4 font-medium">&nbsp;</th>
-										<th className="pb-3 pr-4 font-medium">Z</th>
-										<th className="pb-3 pr-4 font-medium">V</th>
-										<th className="pb-3 pr-4 font-medium">VP</th>
-										<th className="pb-3 pr-4 font-medium">R</th>
-										<th className="pb-3 pr-4 font-medium">PP</th>
-										<th className="pb-3 pr-4 font-medium">P</th>
-										<th className="pb-3 pr-4 font-medium">B</th>
-										<th className="pb-3 pr-4 font-medium">BV</th>
-										<th className="pb-3 pr-4 font-medium">BO</th>
-										<th className="pb-3 font-medium">BR</th>
+										<th className="pb-3 pr-4 font-medium" title="Počet zápasů">Z</th>
+										<th className="pb-3 pr-4 font-medium" title="Výhry">V</th>
+										<th className="pb-3 pr-4 font-medium" title="Výhry po prodloužení nebo nájezdech">VP</th>
+										<th className="pb-3 pr-4 font-medium" title="Remízy">R</th>
+										<th className="pb-3 pr-4 font-medium" title="Prohry po prodloužení nebo nájezdech">PP</th>
+										<th className="pb-3 pr-4 font-medium" title="Prohry">P</th>
+										<th className="pb-3 pr-4 font-medium" title="Body">B</th>
+										<th className="pb-3 pr-4 font-medium" title="Branky vstřelené">BV</th>
+										<th className="pb-3 pr-4 font-medium" title="Branky obdržené">BO</th>
+										<th className="pb-3 font-medium" title="Brankový rozdíl">BR</th>
 									</tr>
 								</thead>
 								<tbody>
 									<tr className="border-t border-white/10 text-white">
-										<th className="py-3 pr-4 font-semibold">Zápasy</th>
-										<td className="py-3 pr-4">{overview.matches}</td>
-										<td className="py-3 pr-4">{overview.wins}</td>
-										<td className="py-3 pr-4">{overview.overtimeWins}</td>
-										<td className="py-3 pr-4">{overview.draws}</td>
-										<td className="py-3 pr-4">{overview.overtimeLosses}</td>
-										<td className="py-3 pr-4">{overview.losses}</td>
-										<td className="py-3 pr-4">{overview.points}</td>
-										<td className="py-3 pr-4">{overview.goalsFor}</td>
-										<td className="py-3 pr-4">{overview.goalsAgainst}</td>
-										<td className="py-3">{overview.goalDiff}</td>
+											<td className="py-3 pr-4">{overview?.matches ?? 0}</td>
+											<td className="py-3 pr-4">{overview?.wins ?? 0}</td>
+											<td className="py-3 pr-4">{overview?.overtimeWins ?? 0}</td>
+											<td className="py-3 pr-4">{overview?.draws ?? 0}</td>
+											<td className="py-3 pr-4">{overview?.overtimeLosses ?? 0}</td>
+											<td className="py-3 pr-4">{overview?.losses ?? 0}</td>
+											<td className="py-3 pr-4">{overview?.points ?? 0}</td>
+											<td className="py-3 pr-4">{overview?.goalsFor ?? 0}</td>
+											<td className="py-3 pr-4">{overview?.goalsAgainst ?? 0}</td>
+											<td className="py-3">{overview?.goalDiff ?? 0}</td>
 									</tr>
 								</tbody>
 							</table>
@@ -225,20 +177,18 @@ export const OverviewPage = () => {
 							<table className="min-w-full text-left text-sm text-slate-200">
 								<thead className="text-xs uppercase tracking-[0.18em] text-slate-400">
 									<tr>
-										<th className="pb-3 pr-4 font-medium">&nbsp;</th>
-										<th className="pb-3 pr-4 font-medium">Počet přesilovek</th>
-										<th className="pb-3 pr-4 font-medium">Góly</th>
-										<th className="pb-3 pr-4 font-medium">% Využití</th>
-										<th className="pb-3 font-medium">Inkasované góly</th>
+										<th className="pb-3 pr-4 font-medium" title="Počet přesilovek">Počet</th>
+										<th className="pb-3 pr-4 font-medium" title="Branky vstřelené v přesilovkách">BV</th>
+										<th className="pb-3 pr-4 font-medium" title="Úspěšnost využití přesilovek v procentech">%</th>
+										<th className="pb-3 font-medium" title="Branky obdržené během vlastní přesilovky">BO</th>
 									</tr>
 								</thead>
 								<tbody>
 									<tr className="border-t border-white/10 text-white">
-										<th className="py-3 pr-4 font-semibold">Přesilovky</th>
-										<td className="py-3 pr-4">{overview.powerPlayOpportunities}</td>
-										<td className="py-3 pr-4">{overview.powerPlayGoals}</td>
-										<td className="py-3 pr-4">{formatPercent(overview.powerPlayEfficiency)}</td>
-										<td className="py-3">{overview.powerPlayGoalsAgainst}</td>
+											<td className="py-3 pr-4">{overview?.powerPlayOpportunities ?? 0}</td>
+											<td className="py-3 pr-4">{overview?.powerPlayGoals ?? 0}</td>
+											<td className="py-3 pr-4">{formatPercent(overview?.powerPlayEfficiency ?? 0)}</td>
+											<td className="py-3">{overview?.powerPlayGoalsAgainst ?? 0}</td>
 									</tr>
 								</tbody>
 							</table>
@@ -251,20 +201,18 @@ export const OverviewPage = () => {
 							<table className="min-w-full text-left text-sm text-slate-200">
 								<thead className="text-xs uppercase tracking-[0.18em] text-slate-400">
 									<tr>
-										<th className="pb-3 pr-4 font-medium">&nbsp;</th>
-										<th className="pb-3 pr-4 font-medium">Počet oslabení</th>
-										<th className="pb-3 pr-4 font-medium">Inkasované góly</th>
-										<th className="pb-3 pr-4 font-medium">% Ubráněná oslabení</th>
-										<th className="pb-3 font-medium">Góly v oslabení</th>
+										<th className="pb-3 pr-4 font-medium" title="Počet oslabení">Počet</th>
+										<th className="pb-3 pr-4 font-medium" title="Branky obdržené v oslabení">BO</th>
+										<th className="pb-3 pr-4 font-medium" title="Úspěšnost ubránění oslabení v procentech">%</th>
+										<th className="pb-3 font-medium" title="Branky vstřelené v oslabení">BV</th>
 									</tr>
 								</thead>
 								<tbody>
 									<tr className="border-t border-white/10 text-white">
-										<th className="py-3 pr-4 font-semibold">Oslabení</th>
-										<td className="py-3 pr-4">{overview.penaltyKillOpportunities}</td>
-										<td className="py-3 pr-4">{overview.penaltyKillGoalsAgainst}</td>
-										<td className="py-3 pr-4">{formatPercent(overview.penaltyKillEfficiency)}</td>
-										<td className="py-3">{overview.shorthandedGoals}</td>
+											<td className="py-3 pr-4">{overview?.penaltyKillOpportunities ?? 0}</td>
+											<td className="py-3 pr-4">{overview?.penaltyKillGoalsAgainst ?? 0}</td>
+											<td className="py-3 pr-4">{formatPercent(overview?.penaltyKillEfficiency ?? 0)}</td>
+											<td className="py-3">{overview?.shorthandedGoals ?? 0}</td>
 									</tr>
 								</tbody>
 							</table>
