@@ -269,7 +269,7 @@ paths:
                 $ref: '#/components/schemas/PlayerDetailResponse'
         '404':
           $ref: '#/components/responses/NotFound'
-  /records:
+  /records/players:
     get:
       tags: [Records]
       summary: Get records tables payload
@@ -285,26 +285,6 @@ paths:
       responses:
         '200':
           description: Records tables payload
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PlayerRecordBookResponse'
-  /records/players:
-    get:
-      tags: [Player Records]
-      summary: Get player recordbook
-      description: |
-        Vraci data pro stranku hráčských rekordů.
-        Scope lze zachovat pro A/B/C/ALL, i kdyz aktualni data jsou rozepsana hlavne pro A tým.
-      parameters:
-        - in: query
-          name: scope
-          required: false
-          schema:
-            $ref: '#/components/schemas/TeamScope'
-      responses:
-        '200':
-          description: Player recordbook payload
           content:
             application/json:
               schema:

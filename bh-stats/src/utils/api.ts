@@ -253,7 +253,7 @@ export const getPlayerDetailStats = async (playerId: string): Promise<PlayerDeta
 };
 
 export const getPlayerRecordBook = async (scope: TeamScope): Promise<PlayerRecordBookResponse> => {
-  return fetchJson<PlayerRecordBookResponse>('/api/records', undefined, { scope });
+  return fetchJson<PlayerRecordBookResponse>('/records/players', undefined, { scope });
 };
 
 export const getTeamRecordBook = async (scope: TeamScope): Promise<TeamRecordBookResponse> => {

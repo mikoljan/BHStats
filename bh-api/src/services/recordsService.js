@@ -924,16 +924,16 @@ function buildWinStreakTable(context) {
 }
 
 function buildHeroStats(sections) {
-  const ppLeader = sections[0]?.tables[0]?.rows?.[0] || null;
+  const seasonPointsLeader = sections[3]?.tables[0]?.rows?.[0] || null;
   const hattrickLeader = sections[1]?.tables[0]?.rows?.[0] || null;
-  const fastestGoal = sections[2]?.tables[0]?.rows?.[0] || null;
-  const topWinStreak = sections[4]?.tables[0]?.rows?.[0] || null;
+  const pointStreakLeader = sections[4]?.tables[2]?.rows?.[0] || null;
+  const appearanceStreakLeader = sections[4]?.tables[3]?.rows?.[0] || null;
 
   return [
     {
-      label: "PP body",
-      value: ppLeader ? `${ppLeader.points}` : "0",
-      note: ppLeader ? ppLeader.playerName : "Bez dat",
+      label: "Body v sezóně",
+      value: seasonPointsLeader ? `${seasonPointsLeader.points}` : "0",
+      note: seasonPointsLeader ? `${seasonPointsLeader.playerName} (${seasonPointsLeader.season})` : "Bez dat",
     },
     {
       label: "Hattricky",
@@ -941,14 +941,14 @@ function buildHeroStats(sections) {
       note: hattrickLeader ? hattrickLeader.playerName : "Bez dat",
     },
     {
-      label: "Nejrychlejší gól",
-      value: fastestGoal ? fastestGoal.time : "00:00",
-      note: fastestGoal ? fastestGoal.playerName : "Bez dat",
+      label: "Nejdelší bodová série",
+      value: pointStreakLeader ? `${pointStreakLeader.count}` : "0",
+      note: pointStreakLeader ? pointStreakLeader.playerName : "Bez dat",
     },
     {
-      label: "Vítězná série",
-      value: topWinStreak ? `${topWinStreak.count}` : "0",
-      note: topWinStreak ? topWinStreak.date : "Bez dat",
+      label: "Nejvíce zápasů bez pauzy",
+      value: appearanceStreakLeader ? `${appearanceStreakLeader.count}` : "0",
+      note: appearanceStreakLeader ? appearanceStreakLeader.playerName : "Bez dat",
     },
   ];
 }

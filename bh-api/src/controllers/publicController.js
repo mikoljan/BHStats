@@ -1,7 +1,6 @@
 import {
   getGoalieStatistics,
   getOverview,
-  getPlayerRecordBook,
   getPlayerStatistics,
   getSeriesMatrix,
   getTeamRecordBook,
@@ -80,23 +79,13 @@ export async function getGoalieStatisticsHandler(req, res) {
   }
 }
 
-// Returns the player record book grouped for frontend rendering.
-export async function getPlayerRecordsHandler(req, res) {
-  try {
-    const dataset = await loadApiDataset();
-    res.status(200).json(getPlayerRecordBook(dataset, req.query.scope || "ALL"));
-  } catch (error) {
-    handleServerError(res, error, "Failed to fetch player recordbook");
-  }
-}
-
 // Returns the dedicated records tables payload for the records page.
-export async function getRecordsHandler(req, res) {
+export async function getPlayerRecordsHandler(req, res) {
   try {
     const dataset = await loadApiDataset();
     res.status(200).json(getRecordsBook(dataset, req.query.scope || "ALL"));
   } catch (error) {
-    handleServerError(res, error, "Failed to fetch records");
+    handleServerError(res, error, "Failed to fetch player records");
   }
 }
 
