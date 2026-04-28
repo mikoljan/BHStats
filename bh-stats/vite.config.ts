@@ -9,6 +9,19 @@ export default defineConfig({
     react(),
     tailwindcss(), 
   ],
+  server: {
+    proxy: {
+      '/api/matches/import-cf': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
