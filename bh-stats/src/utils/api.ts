@@ -115,6 +115,7 @@ export interface ImportMatchResponse {
 export interface CreateSeasonPayload {
   year: string;
   team: 'A' | 'B' | 'C';
+  matchLength: number;
   leagueLevel: number;
   leagueName: string;
   position: number | null;

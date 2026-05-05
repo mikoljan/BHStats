@@ -583,7 +583,7 @@ components:
             $ref: '#/components/schemas/SquadId'
     Season:
       type: object
-      required: [id, year, team, leagueLevel, leagueName, position, covidInterrupted]
+      required: [id, year, team, matchLength, leagueLevel, leagueName, position, covidInterrupted]
       properties:
         id:
           type: string
@@ -593,6 +593,10 @@ components:
         team:
           type: string
           example: A
+        matchLength:
+          type: number
+          minimum: 1
+          description: Delka zapasu v minutach pro danou sezonu. Pouziva se jako zdroj pro import a vsechny absolutni casy udalosti.
         leagueLevel:
           type: integer
           minimum: 1

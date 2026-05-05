@@ -51,25 +51,75 @@ function parsePlayerCell(value) {
 
 // Extracts the period number from a textual period label.
 function parsePeriod(value) {
-  const match = normalizeText(value).match(/(\d+)/);
-  return match ? Number(match[1]) : 1;
+  const normalized = normalizeText(value).toLowerCase();
+  const plainMatch = normalized.match(/^(\d+)$/);
+  if (plainMatch) {
+    return Number(plainMatch[1]);
+  }
+
+  const labelledMatch = normalized.match(/^(\d+)\.\s*[\p{L}]+$/u);
+  return labelledMatch ? Number(labelledMatch[1]) : null;
 }
 
-// Converts a mm:ss clock value into seconds.
-function parseClockToSeconds(value) {
+// Converts a mm:ss clock value into seconds when the source value is valid.
+function tryParseClockToSeconds(value) {
   const normalized = normalizeText(value);
   const match = normalized.match(/^(\d{1,2}):(\d{2})$/);
   if (!match) {
-    return 0;
+    return null;
   }
 
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
+// Converts a mm:ss clock value into seconds.
+function parseClockToSeconds(value) {
+  return tryParseClockToSeconds(value) ?? 0;
+}
+
 // Converts a period label and local clock into absolute match seconds.
-function parseEventTime(periodLabel, clock, periodLengthMinutes) {
+function parseEventTime(periodLabel, clock, periodLengthMinutes, matchLengthMinutes = null) {
+  const clockSeconds = tryParseClockToSeconds(clock);
+  if (clockSeconds === null) {
+    return 0;
+  }
+
+  const periodSeconds = Math.max(1, Math.round(Number(periodLengthMinutes || 0) * 60));
+  const matchSeconds = Math.max(periodSeconds, Math.round(Number(matchLengthMinutes || 0) * 60) || 0);
+
+  if (matchSeconds && clockSeconds > periodSeconds && clockSeconds <= matchSeconds) {
+    return clockSeconds;
+  }
+
   const period = parsePeriod(periodLabel);
-  return (period - 1) * periodLengthMinutes * 60 + parseClockToSeconds(clock);
+  if (!period) {
+    return matchSeconds ? Math.min(clockSeconds, matchSeconds) : clockSeconds;
+  }
+
+  const eventSeconds = (period - 1) * periodSeconds + clockSeconds;
+  if (matchSeconds && eventSeconds > matchSeconds) {
+    if (clockSeconds <= matchSeconds) {
+      return clockSeconds;
+    }
+
+    return matchSeconds;
+  }
+
+  return eventSeconds;
+}
+
+// Resolves the configured period length for the imported season.
+function resolveImportedPeriodLengthMinutes(periodCount, seasonMatchLength) {
+  if (!periodCount) {
+    return 15;
+  }
+
+  const configuredMatchLength = Number(seasonMatchLength || 0);
+  if (configuredMatchLength > 0) {
+    return configuredMatchLength / periodCount;
+  }
+
+  return 15;
 }
 
 // Parses a Czech match date into a UTC Date instance.
@@ -208,7 +258,7 @@ function parsePlayersTable(table, $, onlyGoalies = false) {
 }
 
 // Parses goal events for both teams from the goals overview tables.
-function parseGoalsTables(tables, $, ourTeamIndex, periodLengthMinutes) {
+function parseGoalsTables(tables, $, ourTeamIndex, periodLengthMinutes, matchLengthMinutes) {
   return tables.flatMap((table, tableIndex) =>
     $(table)
       .find("tr")
@@ -222,7 +272,7 @@ function parseGoalsTables(tables, $, ourTeamIndex, periodLengthMinutes) {
 
         return {
           type: cells[3] === "-" ? "EV" : cells[3],
-          time: parseEventTime(cells[1], cells[2], periodLengthMinutes),
+          time: parseEventTime(cells[1], cells[2], periodLengthMinutes, matchLengthMinutes),
           scorer: parsePlayerCell(cells[4]),
           assist: parsePlayerCell(cells[5]),
           ourTeam: tableIndex === ourTeamIndex,
@@ -233,7 +283,7 @@ function parseGoalsTables(tables, $, ourTeamIndex, periodLengthMinutes) {
 }
 
 // Parses penalty events for both teams from the penalty overview tables.
-function parsePenaltiesTables(tables, $, ourTeamIndex, periodLengthMinutes) {
+function parsePenaltiesTables(tables, $, ourTeamIndex, periodLengthMinutes, matchLengthMinutes) {
   return tables.flatMap((table, tableIndex) =>
     $(table)
       .find("tr")
@@ -247,7 +297,7 @@ function parsePenaltiesTables(tables, $, ourTeamIndex, periodLengthMinutes) {
 
         return {
           type: cells[5],
-          time: parseEventTime(cells[1], cells[2], periodLengthMinutes),
+          time: parseEventTime(cells[1], cells[2], periodLengthMinutes, matchLengthMinutes),
           penaltyMinutes: Number.parseInt(cells[4], 10) || 2,
           player: parsePlayerCell(cells[3]),
           ourTeam: tableIndex === ourTeamIndex,
@@ -296,7 +346,7 @@ function enrichGoalFlags(goals) {
 }
 
 // Parses the full Czech Floorball match HTML into importable domain data.
-async function parseCfMatchHtml(rawHtml) {
+async function parseCfMatchHtml(rawHtml, seasonMatchLength = null) {
   const firstLoad = cheerio.load(rawHtml);
   const pageDiv = firstLoad("div.page");
   const $ = cheerio.load(pageDiv.length ? pageDiv.html() : rawHtml);
@@ -310,14 +360,16 @@ async function parseCfMatchHtml(rawHtml) {
   const ourPlayers = playerTables[summary.ourTeamIndex] ? parsePlayersTable(playerTables[summary.ourTeamIndex], $) : [];
   const opponentPlayers = playerTables[summary.ourTeamIndex === 0 ? 1 : 0] ? parsePlayersTable(playerTables[summary.ourTeamIndex === 0 ? 1 : 0], $) : [];
 
+  const configuredMatchLength = Number(seasonMatchLength || 0);
   const derivedMatchLength = ourGoalies.reduce((maxMinutes, goalie) => Math.max(maxMinutes, goalie.minutesPlayed || 0), 0);
-  const periodLengthMinutes = summary.periodCount ? Math.max(1, Math.round((derivedMatchLength || 45) / summary.periodCount)) : 15;
-  const goals = enrichGoalFlags(parseGoalsTables(getSectionTables("PŘEHLED BRANEK", $), $, summary.ourTeamIndex, periodLengthMinutes));
-  const penalties = parsePenaltiesTables(getSectionTables("PŘEHLED VYLOUČENÍ", $), $, summary.ourTeamIndex, periodLengthMinutes);
+  const matchLength = configuredMatchLength > 0 ? configuredMatchLength : (derivedMatchLength || 36);
+  const periodLengthMinutes = resolveImportedPeriodLengthMinutes(summary.periodCount, matchLength);
+  const goals = enrichGoalFlags(parseGoalsTables(getSectionTables("PŘEHLED BRANEK", $), $, summary.ourTeamIndex, periodLengthMinutes, matchLength));
+  const penalties = parsePenaltiesTables(getSectionTables("PŘEHLED VYLOUČENÍ", $), $, summary.ourTeamIndex, periodLengthMinutes, matchLength);
 
   return {
     ...summary,
-    matchLength: derivedMatchLength || summary.periodCount * periodLengthMinutes,
+    matchLength,
     ourPlayers,
     opponentPlayers,
     ourGoalies,
@@ -360,10 +412,12 @@ async function importCfMatch({ link, html, team, year, persist = true }) {
   }
 
   const rawHtml = html || await loadHtml(link);
-  const parsedMatch = await parseCfMatchHtml(rawHtml);
-  const season = await findTeamSeasonByYear(team, year) || await Season.create({
+  let season = await findTeamSeasonByYear(team, year);
+  const parsedMatch = await parseCfMatchHtml(rawHtml, season?.matchLength ?? null);
+  season = season || await Season.create({
     team,
     year: String(year),
+    matchLength: 36,
     leagueLevel: 0,
     leagueName: parsedMatch.leagueName,
   });

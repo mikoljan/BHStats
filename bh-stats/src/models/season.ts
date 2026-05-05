@@ -4,6 +4,7 @@ export interface Season {
   id: string;
   year: string;
   team: string;
+  matchLength: number;
   leagueLevel: number;
   leagueName: string;
   position: number | null;

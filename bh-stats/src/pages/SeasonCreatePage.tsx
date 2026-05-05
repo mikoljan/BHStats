@@ -26,6 +26,7 @@ const competitionOptions = [
 const emptyForm = {
   year: '',
   team: 'A' as SquadId,
+  matchLength: '60',
   leagueLevel: '1',
   leagueName: 'Superliga',
   position: '',
@@ -71,6 +72,7 @@ export const SeasonCreatePage = () => {
       const createdSeason = await createSeason({
         year: form.year.trim(),
         team: form.team,
+        matchLength: Number(form.matchLength),
         leagueLevel: Number(form.leagueLevel),
         leagueName: form.leagueName.trim(),
         position: form.position.trim() ? Number(form.position) : null,
@@ -164,6 +166,23 @@ export const SeasonCreatePage = () => {
             </div>
 
             <div>
+              <label htmlFor="season-match-length" className="text-sm font-semibold text-slate-200">
+                Délka zápasu v minutách
+              </label>
+              <input
+                id="season-match-length"
+                type="number"
+                min={1}
+                step={1}
+                value={form.matchLength}
+                onChange={(event) => updateField('matchLength', event.target.value)}
+                placeholder="60"
+                className="mt-2 w-full rounded-[20px] border border-white/10 bg-slate-950/55 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/40"
+                required
+              />
+            </div>
+
+            <div>
               <label htmlFor="season-league-name" className="text-sm font-semibold text-slate-200">
                 Název soutěže
               </label>
@@ -248,6 +267,7 @@ export const SeasonCreatePage = () => {
             <div>{'{'}</div>
             <div className="pl-4">"year": "{form.year || '2024/2025'}",</div>
             <div className="pl-4">"team": "{form.team}",</div>
+            <div className="pl-4">"matchLength": {form.matchLength || '60'},</div>
             <div className="pl-4">"leagueLevel": {form.leagueLevel || '1'},</div>
             <div className="pl-4">"leagueName": "{form.leagueName || 'Superliga'}",</div>
             <div className="pl-4">"position": {form.position || 'null'},</div>
